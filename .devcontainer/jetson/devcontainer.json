@@ -1,0 +1,85 @@
+{
+    "name": "Rosetta Jetson",
+
+    "build": {
+        "dockerfile": "../../docker/Dockerfile.jetson",
+        "context": "../../docker"
+    },
+
+    "workspaceFolder": "/workspaces/rosetta_ws",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/rosetta_ws,type=bind",
+    // NOTE: Jetson Thor requires root for CUDA access in containers (driver checks UID 0)
+    // The ros user is preserved for file ownership; use "sudo -u ros" if needed
+    "remoteUser": "root",
+
+    // Create auth directories on host if they don't exist
+    "initializeCommand": "mkdir -p ~/.cache/huggingface ~/.config/wandb ~/.claude && touch ~/.netrc 2>/dev/null || true",
+
+    "runArgs": [
+        "--network=host",
+        "--ipc=host",
+        "--privileged",
+        "--runtime=nvidia",
+        "--gpus=all",
+        "--cap-add=SYS_PTRACE",
+        "--cap-add=SYS_NICE",
+        "--security-opt=seccomp:unconfined",
+        "--ulimit=rtprio=98",
+        "--ulimit=memlock=-1"
+    ],
+
+    "containerEnv": {
+        "DISPLAY": "${localEnv:DISPLAY}",
+        "XAUTHORITY": "${localEnv:XAUTHORITY}",
+        "WAYLAND_DISPLAY": "${localEnv:WAYLAND_DISPLAY}",
+        "XDG_RUNTIME_DIR": "${localEnv:XDG_RUNTIME_DIR}",
+        "NVIDIA_VISIBLE_DEVICES": "all",
+        "NVIDIA_DRIVER_CAPABILITIES": "all",
+        "CLAUDE_CONFIG_DIR": "/root/.claude",
+        "CUDA_HOME": "/usr/local/cuda",
+        "VIRTUAL_ENV": "/home/ros/.venv",
+        "PATH": "/home/ros/.venv/bin:/home/ros/.local/bin:/usr/local/cuda/bin:${localEnv:PATH}",
+        "LD_LIBRARY_PATH": "/usr/local/cuda/lib64:/usr/lib/aarch64-linux-gnu/tegra:${localEnv:LD_LIBRARY_PATH}"
+    },
+
+    "mounts": [
+        // X11/Wayland
+        "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind",
+        "source=/run/user/1000,target=/run/user/1000,type=bind",
+        // Hardware access
+        "source=/dev,target=/dev,type=bind",
+        // Tegra GPU access (required on Jetson Thor)
+        "source=/usr/lib/aarch64-linux-gnu/tegra,target=/usr/lib/aarch64-linux-gnu/tegra,type=bind,readonly",
+        "source=/usr/lib/aarch64-linux-gnu/tegra-egl,target=/usr/lib/aarch64-linux-gnu/tegra-egl,type=bind,readonly",
+        // NOTE: We do NOT mount /usr/local/cuda - the NGC container has its own CUDA
+        // configured correctly with PyTorch. Mounting host CUDA would shadow container
+        // libraries and break things like libcusparseLt.so.0
+        // Auth persistence (bind from host - shared across containers)
+        "source=${localEnv:HOME}/.cache/huggingface,target=/home/ros/.cache/huggingface,type=bind,consistency=cached",
+        "source=${localEnv:HOME}/.config/wandb,target=/home/ros/.config/wandb,type=bind,consistency=cached",
+        "source=${localEnv:HOME}/.netrc,target=/home/ros/.netrc,type=bind,consistency=cached",
+        "source=${localEnv:HOME}/.claude,target=/root/.claude,type=bind,consistency=cached",
+        "source=${localEnv:HOME}/.ssh,target=/home/ros/.ssh,type=bind,readonly"
+    ],
+
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "python.defaultInterpreterPath": "/home/ros/.venv/bin/python",
+                "remote.autoForwardPorts": false
+            },
+            "extensions": [
+                "anthropic.claude-code",
+                "ms-iot.vscode-ros",
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "ms-vscode.cpptools",
+                "ms-vscode.cmake-tools",
+                "eamodio.gitlens",
+                "usernamehw.errorlens",
+                "redhat.vscode-yaml",
+                "smilerobotics.urdf"
+            ]
+        }
+    }
+}

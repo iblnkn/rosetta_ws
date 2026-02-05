@@ -1,0 +1,4 @@
+# Workspace-local colcon mixins
+# These are loaded via --mixin-files in build.sh
+mixin:
+  - build.mixin.yaml

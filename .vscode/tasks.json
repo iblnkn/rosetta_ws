@@ -1,0 +1,590 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        // ════════════════════════════════════════════════════════════════════
+        // BUILD TASKS
+        // ════════════════════════════════════════════════════════════════════
+        {
+            "label": "build",
+            "detail": "Build workspace with default mixin (dev)",
+            "type": "shell",
+            "command": "./scripts/build.sh",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": "$gcc"
+        },
+        {
+            "label": "build (select mixin)",
+            "detail": "Build with selected mixin configuration",
+            "type": "shell",
+            "command": "./scripts/build.sh",
+            "args": ["--mixin", "${input:buildMixin}"],
+            "group": "build",
+            "problemMatcher": "$gcc"
+        },
+        {
+            "label": "build (custom mixins)",
+            "detail": "Build with multiple mixins (e.g., 'debug test')",
+            "type": "shell",
+            "command": "./scripts/build.sh",
+            "args": ["--mixin", "${input:customMixins}"],
+            "group": "build",
+            "problemMatcher": "$gcc"
+        },
+        {
+            "label": "build release",
+            "detail": "Optimized release build",
+            "type": "shell",
+            "command": "./scripts/build.sh",
+            "args": ["--mixin", "release"],
+            "group": "build",
+            "problemMatcher": "$gcc"
+        },
+        {
+            "label": "build debug",
+            "detail": "Debug build with full symbols",
+            "type": "shell",
+            "command": "./scripts/build.sh",
+            "args": ["--mixin", "debug"],
+            "group": "build",
+            "problemMatcher": "$gcc"
+        },
+        {
+            "label": "build clean",
+            "detail": "Clean build with cmake cache cleared",
+            "type": "shell",
+            "command": "./scripts/build.sh",
+            "args": ["--clean", "--mixin", "${input:buildMixin}"],
+            "group": "build",
+            "problemMatcher": "$gcc"
+        },
+        {
+            "label": "build package",
+            "detail": "Build a specific package",
+            "type": "shell",
+            "command": "./scripts/build.sh",
+            "args": [
+                "--mixin", "${input:buildMixin}",
+                "--", "--packages-select", "${input:packageName}"
+            ],
+            "group": "build",
+            "problemMatcher": "$gcc"
+        },
+        {
+            "label": "build with tests",
+            "detail": "Build with testing enabled",
+            "type": "shell",
+            "command": "./scripts/build.sh",
+            "args": ["--mixin", "debug", "test"],
+            "group": "build",
+            "problemMatcher": "$gcc"
+        },
+        {
+            "label": "list mixins",
+            "detail": "Show available build mixins",
+            "type": "shell",
+            "command": "./scripts/build.sh",
+            "args": ["--list-mixins"],
+            "problemMatcher": []
+        },
+
+        // ════════════════════════════════════════════════════════════════════
+        // TEST TASKS
+        // ════════════════════════════════════════════════════════════════════
+        {
+            "label": "test",
+            "detail": "Run all tests",
+            "type": "shell",
+            "command": "./scripts/test.sh",
+            "group": {
+                "kind": "test",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "test package",
+            "detail": "Run tests for a specific package",
+            "type": "shell",
+            "command": "./scripts/test.sh",
+            "args": ["${input:packageName}"],
+            "group": "test"
+        },
+        {
+            "label": "test package (verbose)",
+            "detail": "Run tests with live output",
+            "type": "shell",
+            "command": "./scripts/test.sh",
+            "args": ["${input:packageName}", "--verbose"],
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "test rosetta",
+            "detail": "Run tests for rosetta package",
+            "type": "shell",
+            "command": "./scripts/test.sh",
+            "args": ["rosetta"],
+            "group": "test"
+        },
+        {
+            "label": "test rosetta (pytest)",
+            "detail": "Run pytest directly for rosetta",
+            "type": "shell",
+            "command": "cd src/action/rosetta && python3 -m pytest tests/ -v",
+            "options": {
+                "env": {
+                    "PYTHONPATH": "${workspaceFolder}/src/action/rosetta:${env:PYTHONPATH}"
+                }
+            },
+            "group": "test",
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "test results",
+            "detail": "View test results",
+            "type": "shell",
+            "command": "colcon test-result --all --verbose",
+            "group": "test"
+        },
+
+        // ════════════════════════════════════════════════════════════════════
+        // CLEAN TASKS
+        // ════════════════════════════════════════════════════════════════════
+        {
+            "label": "clean",
+            "detail": "Clean cmake artifacts",
+            "type": "shell",
+            "command": "colcon build --cmake-target clean --merge-install",
+            "problemMatcher": []
+        },
+        {
+            "label": "wipe",
+            "detail": "Remove build/install/log directories",
+            "type": "shell",
+            "command": "colcon clean workspace -y || rm -rf build install log",
+            "problemMatcher": []
+        },
+        {
+            "label": "purge",
+            "detail": "Complete workspace purge",
+            "type": "shell",
+            "command": "rm -rf build install log; py3clean . 2>/dev/null || true",
+            "problemMatcher": []
+        },
+
+        // ════════════════════════════════════════════════════════════════════
+        // LINT TASKS
+        // ════════════════════════════════════════════════════════════════════
+        {
+            "label": "lint all",
+            "detail": "Run all linters",
+            "type": "shell",
+            "command": "ament_flake8 --linelength 100 src/action && ament_pep257 src/action && ament_xmllint src/action",
+            "problemMatcher": "$ament_flake8",
+            "presentation": {
+                "panel": "dedicated",
+                "reveal": "silent",
+                "clear": true
+            }
+        },
+        {
+            "label": "lint python",
+            "detail": "Run flake8 and pep257",
+            "type": "shell",
+            "command": "ament_flake8 --linelength 100 src/action && ament_pep257 src/action",
+            "problemMatcher": "$ament_flake8",
+            "presentation": {
+                "panel": "dedicated",
+                "reveal": "silent",
+                "clear": true
+            }
+        },
+        {
+            "label": "lint cpp",
+            "detail": "Run uncrustify and cppcheck",
+            "type": "shell",
+            "command": "ament_uncrustify src/action && ament_cppcheck src/action",
+            "options": {
+                "env": {
+                    "AMENT_CPPCHECK_ALLOW_SLOW_VERSIONS": "1"
+                }
+            },
+            "problemMatcher": "$ament_uncrustify",
+            "presentation": {
+                "panel": "dedicated",
+                "reveal": "silent",
+                "clear": true
+            }
+        },
+
+        // ════════════════════════════════════════════════════════════════════
+        // AUTOFIX TASKS
+        // ════════════════════════════════════════════════════════════════════
+        {
+            "label": "autofix cpp",
+            "detail": "Auto-format C++ files with uncrustify",
+            "type": "shell",
+            "command": "ament_uncrustify --reformat src/action",
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "clear": true
+            }
+        },
+        {
+            "label": "autofix all",
+            "detail": "Run all auto-formatters",
+            "dependsOn": ["autofix cpp"],
+            "problemMatcher": []
+        },
+
+        // ════════════════════════════════════════════════════════════════════
+        // WORKSPACE MANAGEMENT
+        // ════════════════════════════════════════════════════════════════════
+        {
+            "label": "setup",
+            "detail": "Full workspace setup (repos, deps, etc.)",
+            "type": "shell",
+            "command": "./scripts/setup.sh",
+            "problemMatcher": []
+        },
+        {
+            "label": "import repos",
+            "detail": "Import/update repositories from .repos files",
+            "type": "shell",
+            "command": "vcs import src < repos/src.repos --recursive && vcs import libs < repos/libs.repos --recursive",
+            "problemMatcher": []
+        },
+        {
+            "label": "export repos",
+            "detail": "Export current repos to .repos files",
+            "type": "shell",
+            "command": "vcs export src > repos/src.repos && vcs export libs > repos/libs.repos",
+            "problemMatcher": []
+        },
+        {
+            "label": "install deps",
+            "detail": "Install ROS dependencies via rosdep",
+            "type": "shell",
+            "command": "sudo apt update && rosdep update --rosdistro=jazzy && rosdep install --from-paths src --ignore-src -y -r",
+            "problemMatcher": []
+        },
+        {
+            "label": "new package (cmake)",
+            "detail": "Create new ament_cmake package",
+            "type": "shell",
+            "command": "ros2 pkg create --destination-directory src/action --build-type ament_cmake ${input:packageName}",
+            "problemMatcher": []
+        },
+        {
+            "label": "new package (python)",
+            "detail": "Create new ament_python package",
+            "type": "shell",
+            "command": "ros2 pkg create --destination-directory src/action --build-type ament_python ${input:packageName}",
+            "problemMatcher": []
+        },
+
+        // ════════════════════════════════════════════════════════════════════
+        // LEROBOT / ML TASKS
+        // ════════════════════════════════════════════════════════════════════
+        {
+            "label": "convert bags to lerobot",
+            "detail": "Convert ROS2 bags to LeRobot dataset format (sequential)",
+            "type": "shell",
+            "command": "python3",
+            "args": [
+                "-m", "rosetta.port_bags",
+                "--raw-dir", "${input:bagsDir}",
+                "--contract", "${input:contractPath}",
+                "--repo-id", "${input:repoId}",
+                "--root", "${input:datasetRoot}"
+            ],
+            "options": {
+                "env": {
+                    "PYTHONPATH": "${workspaceFolder}/src/action/rosetta:${env:PYTHONPATH}",
+                    "LEROBOT_VIDEO_CODEC": "${input:videoCodec}"
+                }
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "convert bags to lerobot (parallel)",
+            "detail": "Convert ROS2 bags using parallel shards for faster processing",
+            "type": "shell",
+            "command": "./scripts/convert_bags_parallel.sh",
+            "args": [
+                "${input:bagsDir}",
+                "${input:contractPath}",
+                "${input:repoId}",
+                "${input:datasetRoot}",
+                "${input:numShards}"
+            ],
+            "options": {
+                "env": {
+                    "LEROBOT_VIDEO_CODEC": "${input:videoCodec}"
+                }
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "train policy",
+            "detail": "Train LeRobot policy (ACT, SmolVLA, Pi0, etc.) with optional multi-GPU and PEFT/LoRA",
+            "type": "shell",
+            "command": "./scripts/train_policy.sh",
+            "args": [
+                "${input:datasetRepoId}",
+                "${input:policyType}",
+                "${input:trainedPolicyRepoId}",
+                "${input:trainOutputDir}",
+                "${input:jobName}",
+                "${input:batchSize}",
+                "${input:trainingSteps}",
+                "${input:enableWandb}",
+                "${input:multiGpuMode}",
+                "${input:pretrainedConfig}"
+            ],
+            "options": {
+                "env": {
+                    "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+                }
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "resume training",
+            "detail": "Resume training from checkpoint",
+            "type": "shell",
+            "command": "lerobot-train",
+            "args": [
+                "--config_path=${input:checkpointPath}/pretrained_model/train_config.json",
+                "--resume=true"
+            ],
+            "options": {
+                "env": {
+                    "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
+                }
+            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "upload trained policy",
+            "detail": "Upload trained policy checkpoint to HuggingFace Hub",
+            "type": "shell",
+            "command": "huggingface-cli",
+            "args": [
+                "upload",
+                "${input:trainedPolicyRepoId}",
+                "${input:checkpointPath}/pretrained_model"
+            ],
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        }
+    ],
+
+    // ════════════════════════════════════════════════════════════════════════
+    // INPUTS
+    // ════════════════════════════════════════════════════════════════════════
+    "inputs": [
+        {
+            "id": "buildMixin",
+            "type": "pickString",
+            "description": "Select build configuration",
+            "options": [
+                {"label": "dev - Development (debug, no tests)", "value": "dev"},
+                {"label": "debug - Debug build with full symbols", "value": "debug"},
+                {"label": "release - Optimized release", "value": "release"},
+                {"label": "rel-with-deb-info - Release with debug info", "value": "rel-with-deb-info"},
+                {"label": "test - Build with tests enabled", "value": "test"},
+                {"label": "ci - CI build (release + tests + lint)", "value": "ci"},
+                {"label": "prod - Production (optimized, no tracing)", "value": "prod"},
+                {"label": "asan - AddressSanitizer", "value": "asan"},
+                {"label": "tsan - ThreadSanitizer", "value": "tsan"},
+                {"label": "coverage - Code coverage", "value": "coverage"},
+                {"label": "clang-libcxx - Thread safety analysis", "value": "clang-libcxx"}
+            ],
+            "default": "dev"
+        },
+        {
+            "id": "customMixins",
+            "type": "promptString",
+            "description": "Enter mixin(s) separated by spaces (e.g., 'debug test')",
+            "default": "dev"
+        },
+        {
+            "id": "packageName",
+            "type": "promptString",
+            "description": "Package name",
+            "default": "rosetta"
+        },
+        {
+            "id": "trainingSteps",
+            "type": "promptString",
+            "description": "Number of training steps",
+            "default": "100000"
+        },
+        {
+            "id": "policyType",
+            "type": "pickString",
+            "description": "Policy architecture to train",
+            "options": [
+                {"label": "ACT - Action Chunking Transformer (recommended for beginners)", "value": "act"},
+                {"label": "Diffusion Policy - For complex multi-modal tasks", "value": "diffusion"},
+                {"label": "SmolVLA - Efficient VLA (use with LoRA)", "value": "smolvla"},
+                {"label": "Pi0 - Physical Intelligence π₀ (use with LoRA)", "value": "pi0"},
+                {"label": "Pi0Fast - Fast π₀ variant (use with LoRA)", "value": "pi0fast"},
+                {"label": "Pi0.5 - π₀.₅ with open-world generalization", "value": "pi05"},
+                {"label": "NVIDIA GR00T N1.5 - Humanoid foundation model", "value": "gr00t_n1"},
+                {"label": "X-VLA - Soft-Prompted cross-embodiment VLA", "value": "xvla"},
+                {"label": "WALL-OSS - Embodied foundation model", "value": "wall_x"},
+                {"label": "VQ-BeT - Vector Quantized Behavior Transformer", "value": "vqbet"},
+                {"label": "TDMPC - Temporal Difference MPC", "value": "tdmpc"}
+            ],
+            "default": "act"
+        },
+        {
+            "id": "datasetRepoId",
+            "type": "promptString",
+            "description": "Dataset repo ID (local path or HuggingFace repo like 'my-org/my-dataset')",
+            "default": ""
+        },
+        {
+            "id": "trainOutputDir",
+            "type": "promptString",
+            "description": "Output directory for training artifacts",
+            "default": "/workspaces/rosetta_ws/models"
+        },
+        {
+            "id": "jobName",
+            "type": "promptString",
+            "description": "Job name for logging and checkpoints",
+            "default": "my_training_run"
+        },
+        {
+            "id": "batchSize",
+            "type": "pickString",
+            "description": "Training batch size (reduce if OOM)",
+            "options": ["4", "8", "16", "32", "64", "128"],
+            "default": "32"
+        },
+        {
+            "id": "enableWandb",
+            "type": "pickString",
+            "description": "Enable Weights & Biases logging",
+            "options": [
+                {"label": "Yes - Log to W&B", "value": "true"},
+                {"label": "No - Local only", "value": "false"}
+            ],
+            "default": "true"
+        },
+        {
+            "id": "multiGpuMode",
+            "type": "pickString",
+            "description": "GPU configuration for training",
+            "options": [
+                {"label": "Single GPU (default)", "value": "single"},
+                {"label": "2 GPUs (FP16)", "value": "2-gpu-fp16"},
+                {"label": "2 GPUs (BF16 - Ampere+)", "value": "2-gpu-bf16"},
+                {"label": "4 GPUs (FP16)", "value": "4-gpu-fp16"},
+                {"label": "4 GPUs (BF16 - Ampere+)", "value": "4-gpu-bf16"},
+                {"label": "8 GPUs (FP16)", "value": "8-gpu-fp16"},
+                {"label": "8 GPUs (BF16 - Ampere+)", "value": "8-gpu-bf16"}
+            ],
+            "default": "single"
+        },
+        {
+            "id": "pretrainedConfig",
+            "type": "promptString",
+            "description": "Training mode: 'none' (from scratch), 'default' (pretrained), 'lora' (LoRA r=64), 'lora:32', or custom 'org/model' / 'lora:org/model:rank'",
+            "default": "none"
+        },
+        {
+            "id": "trainedPolicyRepoId",
+            "type": "promptString",
+            "description": "Output policy name (e.g., 'my_act_policy' or HuggingFace 'my-org/my-policy')",
+            "default": "my_trained_policy"
+        },
+        {
+            "id": "checkpointPath",
+            "type": "promptString",
+            "description": "Path to checkpoint directory (e.g., outputs/train/my_run/checkpoints/last)",
+            "default": ""
+        },
+        {
+            "id": "bagsDir",
+            "type": "promptString",
+            "description": "Directory containing ROS2 bag recordings",
+            "default": "${workspaceFolder}/datasets/bags"
+        },
+        {
+            "id": "contractPath",
+            "type": "promptString",
+            "description": "Path to Rosetta contract YAML",
+            "default": "${workspaceFolder}/src/action/rosetta/contracts/so_101.yaml"
+        },
+        {
+            "id": "repoId",
+            "type": "promptString",
+            "description": "Dataset name (or HuggingFace repo_id like 'my-org/my-dataset')",
+            "default": "so_101_dataset"
+        },
+        {
+            "id": "datasetRoot",
+            "type": "promptString",
+            "description": "Parent directory for LeRobot datasets",
+            "default": "${workspaceFolder}/datasets/lerobot"
+        },
+        {
+            "id": "numShards",
+            "type": "pickString",
+            "description": "Number of parallel shards (more = faster but uses more CPU/RAM)",
+            "options": ["2", "4", "6", "8"],
+            "default": "4"
+        },
+        {
+            "id": "videoCodec",
+            "type": "pickString",
+            "description": "Video encoder (libx264 is faster, libsvtav1 has better compression)",
+            "options": [
+                {"label": "libx264 - Fast H.264 CPU encoder (recommended)", "value": "libx264"},
+                {"label": "libsvtav1 - AV1 encoder (slower, better compression)", "value": "libsvtav1"},
+                {"label": "h264_nvenc - NVIDIA GPU encoder (if available)", "value": "h264_nvenc"},
+                {"label": "h264_v4l2m2m - Tegra hardware encoder (if available)", "value": "h264_v4l2m2m"}
+            ],
+            "default": "libx264"
+        }
+    ]
+}

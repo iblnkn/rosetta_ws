@@ -1,0 +1,161 @@
+# build.mixin.yaml - Workspace build configurations for ROS 2 Jazzy
+# Usage: colcon build --mixin-files colcon/mixin/*.yaml --mixin <name>
+#        ./scripts/build.sh --mixin debug
+
+# =============================================================================
+# Core Build Types
+# =============================================================================
+- name: debug
+  description: "Debug build with full symbols, no optimization"
+  build:
+    cmake-args:
+      - -DCMAKE_BUILD_TYPE=Debug
+      - -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+- name: release
+  description: "Optimized release build"
+  build:
+    cmake-args:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+- name: rel-with-deb-info
+  description: "Release with debug info (good default for development)"
+  build:
+    cmake-args:
+      - -DCMAKE_BUILD_TYPE=RelWithDebInfo
+      - -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+
+# =============================================================================
+# Testing Configurations
+# =============================================================================
+- name: test
+  description: "Build with testing enabled"
+  build:
+    cmake-args:
+      - -DBUILD_TESTING=ON
+
+- name: no-test
+  description: "Build without tests (faster)"
+  build:
+    cmake-args:
+      - -DBUILD_TESTING=OFF
+
+- name: coverage
+  description: "Build with code coverage instrumentation"
+  build:
+    cmake-args:
+      - -DCMAKE_BUILD_TYPE=Debug
+      - -DCMAKE_CXX_FLAGS=--coverage
+      - -DCMAKE_C_FLAGS=--coverage
+      - -DBUILD_TESTING=ON
+
+# =============================================================================
+# Linting & Static Analysis
+# =============================================================================
+- name: lint
+  description: "Enable ament linting during build"
+  build:
+    cmake-args:
+      - -DBUILD_TESTING=ON
+      - -DAMENT_LINT_AUTO=ON
+
+- name: clang-tidy
+  description: "Enable clang-tidy static analysis"
+  build:
+    cmake-args:
+      - -DCMAKE_CXX_CLANG_TIDY=clang-tidy
+
+# =============================================================================
+# Compiler Toolchains
+# =============================================================================
+- name: clang
+  description: "Build with Clang compiler"
+  build:
+    cmake-args:
+      - -DCMAKE_C_COMPILER=clang
+      - -DCMAKE_CXX_COMPILER=clang++
+
+- name: clang-libcxx
+  description: "Clang with libc++ (enables thread safety analysis)"
+  build:
+    cmake-args:
+      - -DCMAKE_C_COMPILER=clang
+      - -DCMAKE_CXX_COMPILER=clang++
+      - -DCMAKE_CXX_FLAGS=-stdlib=libc++ -D_LIBCPP_ENABLE_THREAD_SAFETY_ANNOTATIONS
+      - -DFORCE_BUILD_VENDOR_PKG=ON
+
+# =============================================================================
+# Sanitizers (requires clang or gcc with support)
+# =============================================================================
+- name: asan
+  description: "AddressSanitizer - detect memory errors"
+  build:
+    cmake-args:
+      - -DCMAKE_BUILD_TYPE=Debug
+      - -DCMAKE_CXX_FLAGS=-fsanitize=address -fno-omit-frame-pointer
+      - -DCMAKE_C_FLAGS=-fsanitize=address -fno-omit-frame-pointer
+      - -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=address
+      - -DCMAKE_SHARED_LINKER_FLAGS=-fsanitize=address
+
+- name: tsan
+  description: "ThreadSanitizer - detect data races"
+  build:
+    cmake-args:
+      - -DCMAKE_BUILD_TYPE=Debug
+      - -DCMAKE_CXX_FLAGS=-fsanitize=thread
+      - -DCMAKE_C_FLAGS=-fsanitize=thread
+      - -DCMAKE_EXE_LINKER_FLAGS=-fsanitize=thread
+      - -DCMAKE_SHARED_LINKER_FLAGS=-fsanitize=thread
+
+- name: ubsan
+  description: "UndefinedBehaviorSanitizer - detect undefined behavior"
+  build:
+    cmake-args:
+      - -DCMAKE_BUILD_TYPE=Debug
+      - -DCMAKE_CXX_FLAGS=-fsanitize=undefined
+      - -DCMAKE_C_FLAGS=-fsanitize=undefined
+
+# =============================================================================
+# Performance & Tracing
+# =============================================================================
+- name: no-tracing
+  description: "Disable ROS 2 tracing instrumentation completely"
+  build:
+    cmake-args:
+      - -DTRACETOOLS_DISABLED=ON
+
+- name: no-tracepoints
+  description: "Disable tracepoints but keep instrumentation"
+  build:
+    cmake-args:
+      - -DTRACETOOLS_TRACEPOINTS_EXCLUDED=ON
+
+# =============================================================================
+# Convenience Combos
+# =============================================================================
+- name: dev
+  description: "Development build (debug + compile_commands + no tests)"
+  build:
+    symlink-install: true
+    cmake-args:
+      - -DCMAKE_BUILD_TYPE=Debug
+      - -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+      - -DBUILD_TESTING=OFF
+
+- name: ci
+  description: "CI build (release + tests + linting)"
+  build:
+    cmake-args:
+      - -DCMAKE_BUILD_TYPE=RelWithDebInfo
+      - -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+      - -DBUILD_TESTING=ON
+      - -DAMENT_LINT_AUTO=ON
+
+- name: prod
+  description: "Production build (optimized, no debug, no tests, no tracing)"
+  build:
+    cmake-args:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DBUILD_TESTING=OFF
+      - -DTRACETOOLS_DISABLED=ON

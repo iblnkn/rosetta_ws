@@ -1,0 +1,276 @@
+# syntax=docker/dockerfile:1.4
+###############################################################################
+# Rosetta Workspace - x86 CUDA Development Image
+#
+# Multi-stage build following official ROS 2 Docker patterns.
+#
+# Stages:
+#   base  - CUDA + ROS 2 core
+#   dev   - Development tools + Python ML stack
+#   full  - Simulation (Gazebo, pinocchio, libfranka)
+#
+# Build:
+#   docker compose build dev      # Development image
+#   docker compose build full     # With simulation
+###############################################################################
+
+###########################################
+# Base image: CUDA + ROS 2 core
+###########################################
+FROM nvidia/cuda:12.8.0-cudnn-devel-ubuntu24.04 AS base
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Locales
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        locales \
+    && locale-gen en_US.UTF-8 \
+    && update-locale LC_ALL=en_US.UTF-8 LANG=en_US.UTF-8 \
+    && rm -rf /var/lib/apt/lists/*
+ENV LANG=en_US.UTF-8
+
+# Timezone
+RUN ln -fs /usr/share/zoneinfo/UTC /etc/localtime \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends tzdata \
+    && dpkg-reconfigure --frontend noninteractive tzdata \
+    && rm -rf /var/lib/apt/lists/*
+
+# Common tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        curl gnupg2 lsb-release sudo software-properties-common wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# ROS 2 apt source (official method)
+RUN curl -L -s -o /tmp/ros2-apt-source.deb \
+        https://github.com/ros-infrastructure/ros-apt-source/releases/download/1.1.0/ros2-apt-source_1.1.0.$(lsb_release -cs)_all.deb \
+    && apt-get update \
+    && apt-get install -y /tmp/ros2-apt-source.deb \
+    && rm -f /tmp/ros2-apt-source.deb \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV ROS_DISTRO=jazzy
+ENV ROS_VERSION=2
+ENV ROS_PYTHON_VERSION=3
+
+# ROS 2 base + Zenoh
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ros-${ROS_DISTRO}-ros-base \
+        ros-${ROS_DISTRO}-rmw-zenoh-cpp \
+        python3-argcomplete \
+        python3-rosdep \
+    && rm -rf /var/lib/apt/lists/*
+
+# NVIDIA OpenGL support
+RUN apt-get update && apt-get install -y -qq --no-install-recommends \
+        libglvnd0 libgl1 libglx0 libegl1 libxext6 libx11-6 \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=graphics,utility,compute
+ENV QT_X11_NO_MITSHM=1
+ENV RMW_IMPLEMENTATION=rmw_zenoh_cpp
+ENV DEBIAN_FRONTEND=
+
+COPY ./ros_entrypoint.sh /
+ENTRYPOINT ["/ros_entrypoint.sh"]
+CMD ["bash"]
+
+###########################################
+# Dev image: tools + Python ML stack
+###########################################
+FROM base AS dev
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Development tools
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        bash-completion build-essential cmake gdb git git-lfs \
+        openssh-client python3-argcomplete python3-pip \
+        ros-dev-tools ros-${ROS_DISTRO}-ament-* vim nano htop \
+        # Libraries
+        libboost-all-dev libeigen3-dev libfmt-dev libpoco-dev \
+        libopencv-dev liburdfdom-tools \
+        # Video/media
+        ffmpeg libavformat-dev libavcodec-dev libavutil-dev \
+        libswscale-dev libswresample-dev \
+        # Hardware
+        can-utils udev usbutils pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN rosdep init || echo "rosdep already initialized" \
+    && rosdep update --rosdistro=${ROS_DISTRO}
+
+# ROS 2 desktop + robotics packages
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ros-${ROS_DISTRO}-desktop \
+        ros-${ROS_DISTRO}-ros2-control \
+        ros-${ROS_DISTRO}-ros2-controllers \
+        ros-${ROS_DISTRO}-xacro \
+        ros-${ROS_DISTRO}-joint-state-publisher-gui \
+        ros-${ROS_DISTRO}-cv-bridge \
+        ros-${ROS_DISTRO}-image-transport \
+        ros-${ROS_DISTRO}-pcl-ros \
+        ros-${ROS_DISTRO}-camera-info-manager \
+        ros-${ROS_DISTRO}-robot-localization \
+        ros-${ROS_DISTRO}-slam-toolbox \
+        ros-${ROS_DISTRO}-teleop-twist-keyboard \
+        ros-${ROS_DISTRO}-teleop-twist-joy \
+        ros-${ROS_DISTRO}-joy \
+        ros-${ROS_DISTRO}-foxglove-bridge \
+        ros-${ROS_DISTRO}-rqt-tf-tree \
+        ros-${ROS_DISTRO}-rosbag2-storage-mcap \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+ARG USERNAME=ros
+ARG USER_UID=1000
+ARG USER_GID=$USER_UID
+
+RUN if getent passwd ubuntu > /dev/null 2>&1; then \
+        userdel -r ubuntu; \
+    fi \
+    && groupadd --gid $USER_GID $USERNAME \
+    && useradd -s /bin/bash --uid $USER_UID --gid $USER_GID -m $USERNAME \
+    && echo "$USERNAME ALL=(root) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME \
+    && chmod 0440 /etc/sudoers.d/$USERNAME
+
+# Shell setup for user
+RUN echo "if [ -f /opt/ros/${ROS_DISTRO}/setup.bash ]; then source /opt/ros/${ROS_DISTRO}/setup.bash; fi" >> /home/$USERNAME/.bashrc \
+    && echo "if [ -f /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash ]; then source /usr/share/colcon_argcomplete/hook/colcon-argcomplete.bash; fi" >> /home/$USERNAME/.bashrc
+
+ENV DEBIAN_FRONTEND=
+ENV AMENT_CPPCHECK_ALLOW_SLOW_VERSIONS=1
+
+# Install uv and Python dependencies (as user)
+USER $USERNAME
+WORKDIR /home/$USERNAME
+
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/home/${USERNAME}/.local/bin:${PATH}"
+
+# Create venv with system-site-packages (for ROS2 Python packages)
+ENV VIRTUAL_ENV=/home/${USERNAME}/.venv
+RUN uv venv --system-site-packages ${VIRTUAL_ENV} \
+    && touch ${VIRTUAL_ENV}/COLCON_IGNORE
+ENV PATH="${VIRTUAL_ENV}/bin:${PATH}"
+
+RUN uv pip install --no-cache \
+        torch torchvision torchaudio \
+        --extra-index-url https://download.pytorch.org/whl/cu128
+
+RUN uv pip install --no-cache \
+        lerobot \
+        scipy scikit-learn datasets einops wandb \
+        gymnasium pygame imageio[ffmpeg] opencv-python-headless \
+        "diffusers>=0.27" "transformers>=4.40" "accelerate>=0.30" \
+        huggingface_hub[cli] hf-transfer \
+        pyserial feetech-servo-sdk \
+        trimesh[easy] yourdfpy \
+        simple-parsing draccus \
+        empy==3.3.4 catkin_pkg lark-parser \
+        transforms3d ruamel.yaml \
+        pytest pre-commit
+
+ENV WORKSPACE=/workspaces/rosetta_ws
+
+# Suppress Ubuntu's "To run a command as administrator" message
+RUN touch ~/.sudo_as_admin_successful
+
+RUN echo "source ~/.venv/bin/activate" >> ~/.bashrc \
+    && echo "if [ -f \"${WORKSPACE}/install/setup.bash\" ]; then source \"${WORKSPACE}/install/setup.bash\"; fi" >> ~/.bashrc \
+    && echo "# ROS2 + venv: Add venv site-packages to PYTHONPATH (https://docs.ros.org/en/jazzy/How-To-Guides/Using-Python-Packages.html)" >> ~/.bashrc \
+    && echo 'export PYTHONPATH="${VIRTUAL_ENV}/lib/python3.12/site-packages:${PYTHONPATH}"' >> ~/.bashrc \
+    && echo "export HF_HUB_ENABLE_HF_TRANSFER=1" >> ~/.bashrc \
+    && echo "alias cb='colcon build --merge-install'" >> ~/.bashrc \
+    && echo "alias cbp='colcon build --merge-install --packages-select'" >> ~/.bashrc \
+    && echo "alias src='source install/setup.bash'" >> ~/.bashrc
+
+WORKDIR ${WORKSPACE}
+
+###########################################
+# Full image: + Simulation
+###########################################
+FROM dev AS full
+
+USER root
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Gazebo
+RUN wget https://packages.osrfoundation.org/gazebo.gpg -O /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] \
+        http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" \
+        | tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null \
+    && apt-get update && apt-get install -y --no-install-recommends \
+        ros-${ROS_DISTRO}-ros-gz \
+        ros-${ROS_DISTRO}-ros-gz-bridge \
+        ros-${ROS_DISTRO}-turtlebot3-gazebo \
+        ros-${ROS_DISTRO}-turtlebot4-simulator \
+    && rm -rf /var/lib/apt/lists/*
+
+# Simulation dependencies (pinocchio, libfranka)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        liburdfdom-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# tinyxml2
+RUN cd /tmp \
+    && git clone --depth 1 --branch 10.0.0 https://github.com/leethomason/tinyxml2.git \
+    && cd tinyxml2 && mkdir build && cd build \
+    && cmake .. -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=OFF \
+        -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
+    && make -j$(nproc) && make install \
+    && rm -rf /tmp/tinyxml2
+
+# console_bridge
+RUN cd /tmp \
+    && git clone --depth 1 --branch 1.0.2 https://github.com/ros/console_bridge.git \
+    && cd console_bridge && mkdir build && cd build \
+    && cmake .. -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=OFF \
+        -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
+    && make -j$(nproc) && make install \
+    && rm -rf /tmp/console_bridge
+
+# assimp
+RUN cd /tmp \
+    && git clone --depth 1 --recursive --branch v5.4.3 https://github.com/assimp/assimp.git \
+    && cd assimp && mkdir build && cd build \
+    && cmake .. -DCMAKE_POSITION_INDEPENDENT_CODE=ON -DBUILD_SHARED_LIBS=OFF \
+        -DASSIMP_BUILD_TESTS=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
+    && make -j$(nproc) && make install \
+    && rm -rf /tmp/assimp
+
+# eigenpy
+RUN cd /tmp \
+    && git clone --depth 1 --recursive --branch v2.8.0 https://github.com/stack-of-tasks/eigenpy.git \
+    && cd eigenpy && mkdir build && cd build \
+    && cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DBUILD_TESTING=OFF \
+    && make -j$(($(nproc) > 4 ? 4 : $(nproc))) && make install && ldconfig \
+    && rm -rf /tmp/eigenpy
+
+# pinocchio (with libfranka patch)
+RUN cd /tmp \
+    && git clone --depth 1 --recursive --branch v3.4.0 https://github.com/stack-of-tasks/pinocchio.git \
+    && cd pinocchio \
+    && curl -sSL https://raw.githubusercontent.com/frankarobotics/libfranka/main/.ci/pinocchio.patch | git apply \
+    && mkdir build && cd build \
+    && cmake .. -DBoost_USE_STATIC_LIBS=ON -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+        -DBUILD_SHARED_LIBS=OFF -DBUILD_PYTHON_INTERFACE=OFF -DBUILD_DOCUMENTATION=OFF \
+        -DBUILD_TESTING=OFF -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr \
+    && make -j$(($(nproc) > 2 ? 2 : $(nproc))) && make install && ldconfig \
+    && rm -rf /tmp/pinocchio
+
+# libfranka
+RUN cd /tmp \
+    && git clone --depth 1 --recurse-submodules --branch 0.15.0 \
+        https://github.com/frankarobotics/libfranka.git \
+    && cd libfranka && mkdir build && cd build \
+    && cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTS=OFF \
+    && make -j$(($(nproc) > 2 ? 2 : $(nproc))) \
+    && cpack -G DEB && dpkg -i libfranka*.deb && ldconfig \
+    && rm -rf /tmp/libfranka
+
+ENV DEBIAN_FRONTEND=
+
+USER $USERNAME
+RUN echo 'export TURTLEBOT3_MODEL=waffle' >> ~/.bashrc

@@ -1,0 +1,23 @@
+# colcon/defaults.yaml - Workspace-wide colcon defaults
+# These are applied automatically to all colcon commands run in this workspace
+# See: https://colcon.readthedocs.io/en/released/user/configuration.html
+
+build:
+  # Always use merge-install for simpler environment
+  merge-install: true
+  
+  # Parallel workers (comment out to use all cores)
+  # parallel-workers: 8
+  
+  # Event handlers for build output
+  event-handlers:
+    - console_cohesion+
+  
+  # Base paths for source
+  base-paths:
+    - src
+
+test:
+  merge-install: true
+  event-handlers:
+    - console_cohesion+

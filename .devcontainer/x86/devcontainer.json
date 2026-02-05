@@ -1,0 +1,74 @@
+{
+    "name": "Rosetta x86",
+
+    "build": {
+        "dockerfile": "../../docker/Dockerfile.x86",
+        "context": "../../docker",
+        "target": "dev"
+    },
+
+    "workspaceFolder": "/workspaces/rosetta_ws",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/rosetta_ws,type=bind",
+    "remoteUser": "ros",
+
+    // Create auth directories on host if they don't exist
+    "initializeCommand": "mkdir -p ~/.cache/huggingface ~/.config/wandb ~/.claude && touch ~/.netrc 2>/dev/null || true",
+
+    "runArgs": [
+        "--network=host",
+        "--ipc=host",
+        "--privileged",
+        "--runtime=nvidia",
+        "--gpus=all",
+        "--cap-add=SYS_PTRACE",
+        "--cap-add=SYS_NICE",
+        "--security-opt=seccomp:unconfined",
+        "--ulimit=rtprio=98",
+        "--ulimit=memlock=-1"
+    ],
+
+    "containerEnv": {
+        "DISPLAY": "${localEnv:DISPLAY}",
+        "XAUTHORITY": "${localEnv:XAUTHORITY}",
+        "WAYLAND_DISPLAY": "${localEnv:WAYLAND_DISPLAY}",
+        "XDG_RUNTIME_DIR": "${localEnv:XDG_RUNTIME_DIR}",
+        "NVIDIA_VISIBLE_DEVICES": "all",
+        "NVIDIA_DRIVER_CAPABILITIES": "all",
+        "CLAUDE_CONFIG_DIR": "/home/ros/.claude"
+    },
+
+    "mounts": [
+        // X11/Wayland
+        "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind",
+        "source=/run/user/1000,target=/run/user/1000,type=bind",
+        // Hardware access
+        "source=/dev,target=/dev,type=bind",
+        // Auth persistence (bind from host - shared across containers)
+        "source=${localEnv:HOME}/.cache/huggingface,target=/home/ros/.cache/huggingface,type=bind,consistency=cached",
+        "source=${localEnv:HOME}/.config/wandb,target=/home/ros/.config/wandb,type=bind,consistency=cached",
+        "source=${localEnv:HOME}/.netrc,target=/home/ros/.netrc,type=bind,consistency=cached",
+        "source=${localEnv:HOME}/.claude,target=/home/ros/.claude,type=bind,consistency=cached",
+        "source=${localEnv:HOME}/.ssh,target=/home/ros/.ssh,type=bind,readonly"
+    ],
+
+    "customizations": {
+        "vscode": {
+            "settings": {
+                "python.defaultInterpreterPath": "/home/ros/.venv/bin/python",
+                "remote.autoForwardPorts": false
+            },
+            "extensions": [
+                "anthropic.claude-code",
+                "ms-iot.vscode-ros",
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "ms-vscode.cpptools",
+                "ms-vscode.cmake-tools",
+                "eamodio.gitlens",
+                "usernamehw.errorlens",
+                "redhat.vscode-yaml",
+                "smilerobotics.urdf"
+            ]
+        }
+    }
+}
