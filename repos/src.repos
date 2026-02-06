@@ -12,10 +12,9 @@ repositories:
   action/rosetta:
     type: git
     url: https://github.com/iblnkn/rosetta.git
-    version: develop
+    version: main
   
   action/rosetta_interfaces:
     type: git
     url: https://github.com/iblnkn/rosetta_interfaces.git
-    version: develop
-
+    version: main
