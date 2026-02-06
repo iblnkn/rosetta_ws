@@ -158,17 +158,6 @@ Open in VS Code and select "Reopen in Container". The devcontainer:
 - Shares credentials from host (`~/.cache/huggingface`, `~/.config/wandb`, `~/.ssh`)
 - Enables GPU passthrough
 
-### Docker Compose
-
-For headless or multi-container setups:
-
-```bash
-docker compose up -d lerobot
-docker compose exec lerobot bash
-```
-
-The `docker-compose.yml` also includes a Zenoh router service for distributed ROS2 communication.
-
 ## VS Code Tasks
 
 The workspace includes pre-configured tasks (`.vscode/tasks.json`):
