@@ -156,9 +156,8 @@ if [[ -d "${WORKSPACE}/libs/lerobot" ]]; then
     echo "[INFO] Installing lerobot..."
     # Use constraints to prevent NumPy 2.x (NGC PyTorch compiled against NumPy 1.x)
     # and pin tokenizers for transformers compatibility
-    pip install --quiet \
-        --constraint <(echo -e "numpy<2\ntokenizers>=0.21,<0.22") \
-        "${WORKSPACE}/libs/lerobot"
+    pip install "${WORKSPACE}/libs/lerobot"
+        # --constraint <(echo -e "numpy<2\ntokenizers>=0.21,<0.22") \
 fi
 
 # ============================================================================
@@ -201,10 +200,6 @@ colcon build \
     "${CLEAN_ARGS[@]}" \
     "${THIS_ARGS[@]}" \
     --packages-skip \
-        isaac_ros_h264_decoder \
-        isaac_ros_h264_encoder \
-        convex_plane_decomposition \
-        convex_plane_decomposition_ros \
     "${EXTRA_ARGS[@]}"
 
 echo ""
