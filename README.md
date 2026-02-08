@@ -148,7 +148,7 @@ Two Dockerfiles for different platforms:
 | File | Platform | Base Image |
 |------|----------|------------|
 | `docker/Dockerfile.x86` | x86_64 with NVIDIA GPU | `nvidia/cuda:12.x` + ROS2 |
-| `docker/Dockerfile.jetson` | NVIDIA Jetson (ARM64) | `dustynv/ros:humble-...` |
+| `docker/Dockerfile.jetson` | NVIDIA Jetson (ARM64) | `dustynv/ros:jazzy-...` |
 
 ### Devcontainer (Recommended)
 
