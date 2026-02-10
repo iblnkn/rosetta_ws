@@ -170,6 +170,7 @@ RUN uv pip install --no-cache \
         simple-parsing draccus \
         empy==3.3.4 catkin_pkg lark-parser \
         transforms3d ruamel.yaml \
+        grpcio \
         pytest pre-commit
 
 ENV WORKSPACE=/workspaces/rosetta_ws
