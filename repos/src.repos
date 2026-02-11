@@ -18,7 +18,12 @@ repositories:
     type: git
     url: https://github.com/iblnkn/rosetta_interfaces.git
     version: main
-
+  
+  bringup/rosetta_bringup:
+    type: git
+    url: https://@github.com:iblnkn/rosetta_bringup.git
+    version: main
+    
   turtlebot3/turtlebot3:
     type: git
     url: https://github.com/ROBOTIS-GIT/turtlebot3.git
