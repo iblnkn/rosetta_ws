@@ -18,3 +18,18 @@ repositories:
     type: git
     url: https://github.com/iblnkn/rosetta_interfaces.git
     version: main
+
+  turtlebot3/turtlebot3:
+    type: git
+    url: https://github.com/ROBOTIS-GIT/turtlebot3.git
+    version: jazzy
+
+  turtlebot3/turtlebot3_simulations:
+    type: git
+    url: https://@github.com:iblnkn/turtlebot3_simulations.git
+    version: jazzy
+
+  utilities/teleop_twist_joy:
+    type: git
+    url: https://@github.com:iblnkn/teleop_twist_joy.git
+    version: rolling

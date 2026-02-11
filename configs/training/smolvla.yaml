@@ -1,0 +1,41 @@
+# ============================================================================
+# SmolVLA - Small Vision-Language-Action Model
+# ============================================================================
+# Efficient 450M VLA that fine-tunes from a pretrained base.
+# LoRA recommended for fast, memory-efficient fine-tuning.
+# ~4 hours on A100 for 20k steps. Recommended: 50+ episodes.
+#
+# Docs: https://huggingface.co/docs/lerobot/smolvla
+# ============================================================================
+
+# -- Dataset (required) -------------------------------------------------------
+dataset: ""
+
+# -- Output -------------------------------------------------------------------
+output_dir: /workspaces/rosetta_ws/models
+hub_repo_id: ""
+
+# -- Training -----------------------------------------------------------------
+batch_size: 64
+steps: 20000
+device: cuda
+wandb: false
+job_name: ""
+
+# -- Multi-GPU (uncomment to enable) -----------------------------------------
+# num_gpus: 2
+# mixed_precision: fp16
+
+# -- Pretrained model ---------------------------------------------------------
+pretrained_path: lerobot/smolvla_base
+
+# -- LoRA fine-tuning (comment out for full fine-tuning) ----------------------
+lora_rank: 64
+
+# -- SmolVLA-specific overrides (uncomment to customize) ----------------------
+# policy:
+#   freeze_vision_encoder: true
+#   train_expert_only: true
+#   train_state_proj: true
+#   optimizer_lr: 1e-3           # higher LR typical for LoRA
+#   scheduler_decay_lr: 1e-4

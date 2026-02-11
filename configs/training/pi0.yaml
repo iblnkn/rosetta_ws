@@ -1,0 +1,40 @@
+# ============================================================================
+# Pi0 - Physical Intelligence Pi-Zero
+# ============================================================================
+# 3B parameter VLA using flow matching with PaLI-Gemma backbone.
+# Fine-tunes from pretrained. Requires bfloat16 + gradient checkpointing.
+#
+# Docs: https://huggingface.co/docs/lerobot/pi0
+# ============================================================================
+
+# -- Dataset (required) -------------------------------------------------------
+dataset: ""
+
+# -- Output -------------------------------------------------------------------
+output_dir: /workspaces/rosetta_ws/models
+hub_repo_id: ""
+
+# -- Training -----------------------------------------------------------------
+batch_size: 32
+steps: 3000
+device: cuda
+wandb: false
+job_name: ""
+
+# -- Multi-GPU (uncomment to enable) -----------------------------------------
+# num_gpus: 2
+# mixed_precision: bf16
+
+# -- Pretrained model ---------------------------------------------------------
+pretrained_path: lerobot/pi0_base
+
+# -- LoRA fine-tuning (uncomment for parameter-efficient fine-tuning) ---------
+# lora_rank: 32
+
+# -- Pi0-specific settings (recommended - do not remove) ----------------------
+policy:
+  dtype: bfloat16
+  gradient_checkpointing: true
+  compile_model: true
+  # freeze_vision_encoder: false
+  # train_expert_only: false

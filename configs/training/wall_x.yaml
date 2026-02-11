@@ -1,0 +1,37 @@
+# ============================================================================
+# Wall-X (WALL-OSS) - Embodied Foundation Model
+# ============================================================================
+# Tightly-coupled MoE architecture from X-Square Robot. Supports both
+# diffusion and FAST token prediction modes.
+#
+# Docs: https://huggingface.co/docs/lerobot/wall_x
+# ============================================================================
+
+# -- Dataset (required) -------------------------------------------------------
+dataset: ""
+
+# -- Output -------------------------------------------------------------------
+output_dir: /workspaces/rosetta_ws/models
+hub_repo_id: ""
+
+# -- Training -----------------------------------------------------------------
+batch_size: 32
+steps: 3000
+device: cuda
+wandb: false
+job_name: ""
+
+# -- Multi-GPU (uncomment to enable) -----------------------------------------
+# num_gpus: 2
+# mixed_precision: bf16
+
+# -- Pretrained model ---------------------------------------------------------
+pretrained_path: x-square-robot/wall-oss-flow
+
+# -- LoRA fine-tuning (uncomment for parameter-efficient fine-tuning) ---------
+# lora_rank: 32
+
+# -- Wall-X-specific settings ------------------------------------------------
+policy:
+  prediction_mode: diffusion       # diffusion or fast
+  attn_implementation: eager       # eager, flash_attention_2, or sdpa

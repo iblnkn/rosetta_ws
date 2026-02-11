@@ -4,7 +4,7 @@
     "build": {
         "dockerfile": "../../docker/Dockerfile.x86",
         "context": "../../docker",
-        "target": "dev"
+        "target": "sim"
     },
 
     "workspaceFolder": "/workspaces/rosetta_ws",
@@ -28,7 +28,7 @@
     ],
 
     "containerEnv": {
-        "DISPLAY": "${localEnv:DISPLAY}",
+        "DISPLAY": "${localEnv:DISPLAY:-:1}",
         "XAUTHORITY": "${localEnv:XAUTHORITY}",
         "WAYLAND_DISPLAY": "${localEnv:WAYLAND_DISPLAY}",
         "XDG_RUNTIME_DIR": "${localEnv:XDG_RUNTIME_DIR}",

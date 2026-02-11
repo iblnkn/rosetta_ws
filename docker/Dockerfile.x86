@@ -7,11 +7,13 @@
 # Stages:
 #   base  - CUDA + ROS 2 core
 #   dev   - Development tools + Python ML stack
-#   full  - Simulation (Gazebo, pinocchio, libfranka)
+#   sim   - Gazebo Harmonic + TurtleBot3 simulation
+#   full  - sim + manipulation (pinocchio, libfranka)
 #
 # Build:
 #   docker compose build dev      # Development image
-#   docker compose build full     # With simulation
+#   docker compose build sim      # With TurtleBot3 simulation
+#   docker compose build full     # With simulation + manipulation
 ###############################################################################
 
 ###########################################
@@ -132,6 +134,7 @@ RUN if getent passwd ubuntu > /dev/null 2>&1; then \
     fi \
     && groupadd --gid $USER_GID $USERNAME \
     && useradd -s /bin/bash --uid $USER_UID --gid $USER_GID -m $USERNAME \
+    && usermod -aG video $USERNAME \
     && echo "$USERNAME ALL=(root) NOPASSWD:ALL" > /etc/sudoers.d/$USERNAME \
     && chmod 0440 /etc/sudoers.d/$USERNAME
 
@@ -190,26 +193,55 @@ RUN echo "source ~/.venv/bin/activate" >> ~/.bashrc \
 WORKDIR ${WORKSPACE}
 
 ###########################################
-# Full image: + Simulation
+# Sim image: Gazebo Harmonic + TurtleBot3
 ###########################################
-FROM dev AS full
+FROM dev AS sim
 
 USER root
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Gazebo
-RUN wget https://packages.osrfoundation.org/gazebo.gpg -O /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg \
+# Gazebo Harmonic (OSRF repository) + ROS-Gazebo bridge + TurtleBot3 dependencies
+RUN wget https://packages.osrfoundation.org/gazebo.gpg \
+        -O /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg \
     && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] \
         http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" \
         | tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null \
     && apt-get update && apt-get install -y --no-install-recommends \
         ros-${ROS_DISTRO}-ros-gz \
         ros-${ROS_DISTRO}-ros-gz-bridge \
-        ros-${ROS_DISTRO}-turtlebot3-gazebo \
+        ros-${ROS_DISTRO}-cartographer \
+        ros-${ROS_DISTRO}-cartographer-ros \
+        ros-${ROS_DISTRO}-navigation2 \
+        ros-${ROS_DISTRO}-nav2-bringup \
+        ros-${ROS_DISTRO}-turtlebot3-msgs \
+        ros-${ROS_DISTRO}-dynamixel-sdk \
+    && rm -rf /var/lib/apt/lists/*
+
+# TurtleBot3 + simulation source packages are managed via repos/src.repos
+# After container start: vcs import src < repos/src.repos && colcon build
+ARG USERNAME=ros
+USER ${USERNAME}
+
+RUN echo 'export TURTLEBOT3_MODEL=waffle' >> ~/.bashrc
+
+ENV DEBIAN_FRONTEND=
+
+WORKDIR ${WORKSPACE}
+
+###########################################
+# Full image: + Manipulation
+###########################################
+FROM sim AS full
+
+USER root
+ENV DEBIAN_FRONTEND=noninteractive
+
+# TurtleBot4 simulator (Gazebo + OSRF repo already configured in sim stage)
+RUN apt-get update && apt-get install -y --no-install-recommends \
         ros-${ROS_DISTRO}-turtlebot4-simulator \
     && rm -rf /var/lib/apt/lists/*
 
-# Simulation dependencies (pinocchio, libfranka)
+# Manipulation dependencies (pinocchio, libfranka)
 RUN apt-get update && apt-get install -y --no-install-recommends \
         liburdfdom-dev \
     && rm -rf /var/lib/apt/lists/*

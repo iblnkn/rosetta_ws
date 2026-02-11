@@ -34,9 +34,11 @@ rosetta_ws/
 │   └── rosetta_rl/
 ├── libs/                    # Python libraries (from repos/libs.repos)
 │   └── lerobot/             # LeRobot (editable install)
+├── configs/
+│   └── training/            # Per-model training configs (YAML)
 ├── models/                  # Trained policies
-│   ├── act/
-│   └── pi05/
+│   ├── ACT/
+│   └── Pi0/
 ├── datasets/
 │   ├── bags/                # Raw rosbag recordings
 │   └── lerobot/             # Converted LeRobot datasets
@@ -129,6 +131,12 @@ vcs import libs < repos/libs.repos
 
 Currently commented out since packages are embedded for development.
 
+### `configs/training/`
+
+Per-model training configuration files. Each YAML has good defaults for its model — batch size, steps, pretrained path, LoRA, and model-specific settings. Pick a config, set your dataset, and train.
+
+Available configs: `act.yaml`, `diffusion.yaml`, `smolvla.yaml`, `pi0.yaml`, `pi0_fast.yaml`, `pi05.yaml`, `groot.yaml`, `xvla.yaml`, `wall_x.yaml`, `vqbet.yaml`, `tdmpc.yaml`
+
 ### `scripts/`
 
 Workflow automation scripts:
@@ -138,7 +146,7 @@ Workflow automation scripts:
 | `build.sh` | Build workspace with colcon |
 | `setup.sh` | First-time setup (rosdep, pip installs) |
 | `convert_bags_parallel.sh` | Parallel bag-to-dataset conversion |
-| `train_policy.sh` | Training with policy selection and multi-GPU |
+| `train.py` | Train a policy from a YAML config file |
 | `test.sh` | Run tests |
 
 ## Docker
@@ -158,6 +166,34 @@ Open in VS Code and select "Reopen in Container". The devcontainer:
 - Shares credentials from host (`~/.cache/huggingface`, `~/.config/wandb`, `~/.ssh`)
 - Enables GPU passthrough
 
+## Training
+
+Each supported model has a YAML config in `configs/training/` with sensible defaults. To train:
+
+**Via VS Code task** (`Ctrl+Shift+P` → "Tasks: Run Task" → "train policy"):
+1. Pick a model config
+2. Enter your dataset path or HuggingFace repo ID
+
+**Via CLI:**
+```bash
+# Train ACT from scratch
+python scripts/train.py configs/training/act.yaml --dataset my-org/my-dataset
+
+# Fine-tune SmolVLA with LoRA (defaults from config)
+python scripts/train.py configs/training/smolvla.yaml --dataset my-org/my-dataset
+
+# Override any config value from the command line
+python scripts/train.py configs/training/pi0.yaml --dataset my-org/data --steps 5000 --batch_size 16
+
+# Resume from last checkpoint
+python scripts/train.py --resume models/ACT
+
+# Preview the command without running it
+python scripts/train.py configs/training/act.yaml --dataset my-org/data --dry-run
+```
+
+To customize training (batch size, steps, LoRA, multi-GPU, etc.), edit the YAML config directly — each file is self-documented with only the options relevant to that model.
+
 ## VS Code Tasks
 
 The workspace includes pre-configured tasks (`.vscode/tasks.json`):
@@ -167,9 +203,10 @@ The workspace includes pre-configured tasks (`.vscode/tasks.json`):
 | `build` | Build with colcon |
 | `convert bags to lerobot` | Convert recordings to dataset |
 | `convert bags to lerobot (parallel)` | Parallel conversion (faster) |
-| `train policy` | Interactive policy training |
-| `resume training` | Resume from checkpoint |
-| `upload trained policy` | Push to HuggingFace Hub |
+| `train policy` | Train a policy (pick model config + dataset) |
+| `train policy (with Hub upload)` | Train and push to HuggingFace Hub |
+| `resume training` | Resume from last checkpoint |
+| `upload trained policy` | Push checkpoint to HuggingFace Hub |
 
 Access via `Ctrl+Shift+P` → "Tasks: Run Task".
 

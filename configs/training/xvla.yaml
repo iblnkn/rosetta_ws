@@ -1,0 +1,42 @@
+# ============================================================================
+# XVLA - Extended Vision-Language-Action Model
+# ============================================================================
+# Cross-embodiment VLA with soft-prompt conditioning. 0.9B parameters.
+# Uses Florence2 vision backbone with differential learning rates.
+# action_mode=auto is recommended (auto-detects your robot's action space).
+#
+# Docs: https://huggingface.co/docs/lerobot/xvla
+# ============================================================================
+
+# -- Dataset (required) -------------------------------------------------------
+dataset: ""
+
+# -- Output -------------------------------------------------------------------
+output_dir: /workspaces/rosetta_ws/models
+hub_repo_id: ""
+
+# -- Training -----------------------------------------------------------------
+batch_size: 32
+steps: 20000
+device: cuda
+wandb: false
+job_name: ""
+
+# -- Multi-GPU (uncomment to enable) -----------------------------------------
+# num_gpus: 2
+# mixed_precision: bf16
+
+# -- Pretrained model ---------------------------------------------------------
+pretrained_path: lerobot/xvla-base
+
+# -- LoRA fine-tuning (uncomment for parameter-efficient fine-tuning) ---------
+# lora_rank: 32
+
+# -- XVLA-specific settings (recommended) ------------------------------------
+policy:
+  dtype: bfloat16
+  action_mode: auto
+  freeze_vision_encoder: false
+  freeze_language_encoder: false
+  train_policy_transformer: true
+  train_soft_prompts: true

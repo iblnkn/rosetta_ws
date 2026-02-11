@@ -1,0 +1,41 @@
+# ============================================================================
+# Pi0Fast - Fast Autoregressive Pi-Zero
+# ============================================================================
+# Uses FAST action tokenization for ~5x faster training than Pi0.
+# Autoregressive next-token prediction instead of flow matching.
+# Supports KV-caching for fast inference.
+#
+# Docs: https://huggingface.co/docs/lerobot/pi0fast
+# ============================================================================
+
+# -- Dataset (required) -------------------------------------------------------
+dataset: ""
+
+# -- Output -------------------------------------------------------------------
+output_dir: /workspaces/rosetta_ws/models
+hub_repo_id: ""
+
+# -- Training -----------------------------------------------------------------
+batch_size: 4
+steps: 100000
+device: cuda
+wandb: false
+job_name: ""
+
+# -- Multi-GPU (uncomment to enable) -----------------------------------------
+# num_gpus: 2
+# mixed_precision: bf16
+
+# -- Pretrained model ---------------------------------------------------------
+pretrained_path: lerobot/pi0fast_base
+
+# -- LoRA fine-tuning (uncomment for parameter-efficient fine-tuning) ---------
+# lora_rank: 32
+
+# -- Pi0Fast-specific settings (recommended - do not remove) ------------------
+policy:
+  dtype: bfloat16
+  gradient_checkpointing: true
+  chunk_size: 10
+  n_action_steps: 10
+  max_action_tokens: 256

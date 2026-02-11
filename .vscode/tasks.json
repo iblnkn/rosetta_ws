@@ -348,26 +348,33 @@
         },
         {
             "label": "train policy",
-            "detail": "Train LeRobot policy (ACT, SmolVLA, Pi0, etc.) with optional multi-GPU and PEFT/LoRA",
+            "detail": "Train LeRobot policy using a per-model config (edit YAML for advanced options)",
             "type": "shell",
-            "command": "./scripts/train_policy.sh",
+            "command": "python3",
             "args": [
-                "${input:datasetRepoId}",
-                "${input:policyType}",
-                "${input:trainedPolicyRepoId}",
-                "${input:trainOutputDir}",
-                "${input:jobName}",
-                "${input:batchSize}",
-                "${input:trainingSteps}",
-                "${input:enableWandb}",
-                "${input:multiGpuMode}",
-                "${input:pretrainedConfig}"
+                "scripts/train.py",
+                "configs/training/${input:trainingConfig}",
+                "--dataset", "${input:datasetRepoId}"
             ],
-            "options": {
-                "env": {
-                    "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
-                }
-            },
+            "problemMatcher": [],
+            "presentation": {
+                "reveal": "always",
+                "panel": "shared",
+                "clear": true
+            }
+        },
+        {
+            "label": "train policy (with Hub upload)",
+            "detail": "Train and push trained model to HuggingFace Hub",
+            "type": "shell",
+            "command": "python3",
+            "args": [
+                "scripts/train.py",
+                "configs/training/${input:trainingConfig}",
+                "--dataset", "${input:datasetRepoId}",
+                "--hub_repo_id", "${input:trainedPolicyRepoId}",
+                "--push_to_hub", "true"
+            ],
             "problemMatcher": [],
             "presentation": {
                 "reveal": "always",
@@ -377,18 +384,13 @@
         },
         {
             "label": "resume training",
-            "detail": "Resume training from checkpoint",
+            "detail": "Resume training from last checkpoint in a model directory",
             "type": "shell",
-            "command": "lerobot-train",
+            "command": "python3",
             "args": [
-                "--config_path=${input:checkpointPath}/pretrained_model/train_config.json",
-                "--resume=true"
+                "scripts/train.py",
+                "--resume", "${input:modelOutputDir}"
             ],
-            "options": {
-                "env": {
-                    "PYTORCH_CUDA_ALLOC_CONF": "expandable_segments:True"
-                }
-            },
             "problemMatcher": [],
             "presentation": {
                 "reveal": "always",
@@ -404,7 +406,7 @@
             "args": [
                 "upload",
                 "${input:trainedPolicyRepoId}",
-                "${input:checkpointPath}/pretrained_model"
+                "${input:modelOutputDir}/checkpoints/last/pretrained_model"
             ],
             "problemMatcher": [],
             "presentation": {
@@ -451,97 +453,41 @@
             "default": "rosetta"
         },
         {
-            "id": "trainingSteps",
-            "type": "promptString",
-            "description": "Number of training steps",
-            "default": "100000"
-        },
-        {
-            "id": "policyType",
+            "id": "trainingConfig",
             "type": "pickString",
-            "description": "Policy architecture to train",
+            "description": "Select model (each config has its own defaults for batch size, steps, LoRA, etc.)",
             "options": [
-                {"label": "ACT - Action Chunking Transformer (recommended for beginners)", "value": "act"},
-                {"label": "Diffusion Policy - For complex multi-modal tasks", "value": "diffusion"},
-                {"label": "SmolVLA - Efficient VLA (use with LoRA)", "value": "smolvla"},
-                {"label": "Pi0 - Physical Intelligence π₀ (use with LoRA)", "value": "pi0"},
-                {"label": "Pi0Fast - Fast π₀ variant (use with LoRA)", "value": "pi0fast"},
-                {"label": "Pi0.5 - π₀.₅ with open-world generalization", "value": "pi05"},
-                {"label": "NVIDIA GR00T N1.5 - Humanoid foundation model", "value": "gr00t_n1"},
-                {"label": "X-VLA - Soft-Prompted cross-embodiment VLA", "value": "xvla"},
-                {"label": "WALL-OSS - Embodied foundation model", "value": "wall_x"},
-                {"label": "VQ-BeT - Vector Quantized Behavior Transformer", "value": "vqbet"},
-                {"label": "TDMPC - Temporal Difference MPC", "value": "tdmpc"}
+                {"label": "ACT - Action Chunking Transformer (from scratch, beginner-friendly)", "value": "act.yaml"},
+                {"label": "Diffusion Policy - For complex multi-modal tasks (from scratch)", "value": "diffusion.yaml"},
+                {"label": "SmolVLA - Efficient VLA with LoRA (fine-tune)", "value": "smolvla.yaml"},
+                {"label": "Pi0 - Physical Intelligence flow-matching VLA (fine-tune)", "value": "pi0.yaml"},
+                {"label": "Pi0Fast - Fast autoregressive Pi0 variant (fine-tune)", "value": "pi0_fast.yaml"},
+                {"label": "Pi0.5 - Open-world generalization VLA (fine-tune)", "value": "pi05.yaml"},
+                {"label": "GR00T N1.5 - NVIDIA humanoid foundation model (fine-tune)", "value": "groot.yaml"},
+                {"label": "XVLA - Cross-embodiment VLA with soft prompts (fine-tune)", "value": "xvla.yaml"},
+                {"label": "Wall-X - WALL-OSS embodied foundation model (fine-tune)", "value": "wall_x.yaml"},
+                {"label": "VQ-BeT - Vector Quantized Behavior Transformer (from scratch)", "value": "vqbet.yaml"},
+                {"label": "TDMPC - Temporal Difference MPC (from scratch)", "value": "tdmpc.yaml"}
             ],
-            "default": "act"
+            "default": "act.yaml"
         },
         {
             "id": "datasetRepoId",
             "type": "promptString",
-            "description": "Dataset repo ID (local path or HuggingFace repo like 'my-org/my-dataset')",
+            "description": "Dataset: local path or HuggingFace repo ID (e.g., 'my-org/my-dataset')",
             "default": ""
-        },
-        {
-            "id": "trainOutputDir",
-            "type": "promptString",
-            "description": "Output directory for training artifacts",
-            "default": "/workspaces/rosetta_ws/models"
-        },
-        {
-            "id": "jobName",
-            "type": "promptString",
-            "description": "Job name for logging and checkpoints",
-            "default": "my_training_run"
-        },
-        {
-            "id": "batchSize",
-            "type": "pickString",
-            "description": "Training batch size (reduce if OOM)",
-            "options": ["4", "8", "16", "32", "64", "128"],
-            "default": "32"
-        },
-        {
-            "id": "enableWandb",
-            "type": "pickString",
-            "description": "Enable Weights & Biases logging",
-            "options": [
-                {"label": "Yes - Log to W&B", "value": "true"},
-                {"label": "No - Local only", "value": "false"}
-            ],
-            "default": "true"
-        },
-        {
-            "id": "multiGpuMode",
-            "type": "pickString",
-            "description": "GPU configuration for training",
-            "options": [
-                {"label": "Single GPU (default)", "value": "single"},
-                {"label": "2 GPUs (FP16)", "value": "2-gpu-fp16"},
-                {"label": "2 GPUs (BF16 - Ampere+)", "value": "2-gpu-bf16"},
-                {"label": "4 GPUs (FP16)", "value": "4-gpu-fp16"},
-                {"label": "4 GPUs (BF16 - Ampere+)", "value": "4-gpu-bf16"},
-                {"label": "8 GPUs (FP16)", "value": "8-gpu-fp16"},
-                {"label": "8 GPUs (BF16 - Ampere+)", "value": "8-gpu-bf16"}
-            ],
-            "default": "single"
-        },
-        {
-            "id": "pretrainedConfig",
-            "type": "promptString",
-            "description": "Training mode: 'none' (from scratch), 'default' (pretrained), 'lora' (LoRA r=64), 'lora:32', or custom 'org/model' / 'lora:org/model:rank'",
-            "default": "none"
         },
         {
             "id": "trainedPolicyRepoId",
             "type": "promptString",
-            "description": "Output policy name (e.g., 'my_act_policy' or HuggingFace 'my-org/my-policy')",
-            "default": "my_trained_policy"
+            "description": "HuggingFace repo ID for upload (e.g., 'my-org/my-policy')",
+            "default": ""
         },
         {
-            "id": "checkpointPath",
+            "id": "modelOutputDir",
             "type": "promptString",
-            "description": "Path to checkpoint directory (e.g., outputs/train/my_run/checkpoints/last)",
-            "default": ""
+            "description": "Model output directory (e.g., 'models/ACT' or 'models/SmolVLA')",
+            "default": "/workspaces/rosetta_ws/models/"
         },
         {
             "id": "bagsDir",

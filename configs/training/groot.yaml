@@ -1,0 +1,40 @@
+# ============================================================================
+# GR00T N1.5 - NVIDIA Humanoid Foundation Model
+# ============================================================================
+# Cross-embodiment model for humanoid robots. Requires flash attention
+# and CUDA. No default pretrained model on HuggingFace Hub -- you must
+# provide a path to a downloaded checkpoint.
+#
+# Requires: pip install -e ".[groot]" (flash-attn, gr00t dependencies)
+# Docs: https://huggingface.co/docs/lerobot/groot
+# ============================================================================
+
+# -- Dataset (required) -------------------------------------------------------
+dataset: ""
+
+# -- Output -------------------------------------------------------------------
+output_dir: /workspaces/rosetta_ws/models
+hub_repo_id: ""
+
+# -- Training -----------------------------------------------------------------
+batch_size: 32
+steps: 30000
+device: cuda
+wandb: false
+job_name: ""
+
+# -- Multi-GPU (uncomment to enable) -----------------------------------------
+# num_gpus: 2
+# mixed_precision: bf16
+
+# -- Pretrained model (required - GR00T has no default on HF Hub) -------------
+pretrained_path: nvidia/GR00T-N1.5-3B
+
+# -- LoRA fine-tuning (uncomment for parameter-efficient fine-tuning) ---------
+# lora_rank: 32
+
+# -- GR00T-specific settings --------------------------------------------------
+policy:
+  tune_projector: true
+  tune_diffusion_model: true
+  use_bf16: true

@@ -1,0 +1,29 @@
+# ============================================================================
+# VQ-BeT - Vector Quantized Behavior Transformer
+# ============================================================================
+# Trains from scratch. Uses vector-quantized action tokens with a
+# transformer architecture for multi-modal behavior learning.
+#
+# Docs: https://huggingface.co/docs/lerobot
+# ============================================================================
+
+# -- Dataset (required) -------------------------------------------------------
+dataset: ""
+
+# -- Output -------------------------------------------------------------------
+output_dir: /workspaces/rosetta_ws/models
+hub_repo_id: ""
+
+# -- Training -----------------------------------------------------------------
+batch_size: 8
+steps: 100000
+device: cuda
+wandb: false
+job_name: ""
+
+# -- Multi-GPU (uncomment to enable) -----------------------------------------
+# num_gpus: 2
+# mixed_precision: fp16
+
+# -- Model --------------------------------------------------------------------
+policy_type: vqbet
