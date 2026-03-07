@@ -1,0 +1,90 @@
+[workspace]
+name = "rosetta_ws"
+description = "ROS 2 Jazzy + LeRobot development workspace"
+channels = ["https://prefix.dev/robostack-jazzy", "https://prefix.dev/conda-forge"]
+platforms = ["linux-64", "osx-arm64", "linux-aarch64"]
+
+# Automatically source the colcon workspace overlay on activation
+[target.unix.activation]
+scripts = ["install/setup.bash"]
+env = { RMW_IMPLEMENTATION = "rmw_zenoh_cpp" }
+
+[feature.build.target.unix.tasks]
+setup = "./scripts/setup.sh"
+build = "colcon build --merge-install --symlink-install --continue-on-error --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DBUILD_TESTING=OFF -DPython_FIND_VIRTUALENV=ONLY -DPython3_FIND_VIRTUALENV=ONLY"
+
+[dependencies]
+python = ">=3.12"
+compilers = "*"
+cmake = ">=3.16,<4.0"
+pkg-config = "*"
+make = "*"
+ninja = "*"
+rosdep = "*"
+colcon-common-extensions = "*"
+vcstool = "*"
+packaging = ">=24.2,<26.0"
+
+# ROS 2 Jazzy
+ros-jazzy-desktop = "*"
+ros-jazzy-rmw-zenoh-cpp = ">=0.2.9,<0.3"
+ros-jazzy-cv-bridge = "*"
+ros-jazzy-image-transport = "*"
+ros-jazzy-pcl-ros = "*"
+ros-jazzy-rosbag2-storage-mcap = "*"
+ros-jazzy-teleop-twist-keyboard = "*"
+ros-jazzy-teleop-twist-joy = "*"
+ros-jazzy-joy = "*"
+ros-jazzy-ament-cmake-vendor-package = ">=2.5.4,<3"
+ros-jazzy-camera-calibration-parsers = "*"
+
+# These may or may not be available on robostack-jazzy for all platforms.
+# Comment out any that fail to resolve.
+# ros-jazzy-ros2-control = "*"
+# ros-jazzy-ros2-controllers = "*"
+# ros-jazzy-xacro = "*"
+# ros-jazzy-joint-state-publisher-gui = "*"
+# ros-jazzy-camera-info-manager = "*"
+# ros-jazzy-foxglove-bridge = "*"
+# ros-jazzy-robot-localization = "*"
+# ros-jazzy-slam-toolbox = "*"
+# ros-jazzy-rqt-tf-tree = "*"
+
+[pypi-dependencies]
+lerobot = { path = "libs/lerobot", editable = true }
+torch = "*"
+torchvision = "*"
+torchaudio = "*"
+scipy = "*"
+scikit-learn = "*"
+datasets = "*"
+einops = "*"
+wandb = "*"
+gymnasium = "*"
+imageio = { version = "*", extras = ["ffmpeg"] }
+opencv-python-headless = "*"
+diffusers = ">=0.27"
+transformers = ">=4.40"
+accelerate = ">=0.30"
+huggingface-hub = { version = "*", extras = ["cli"] }
+hf-transfer = "*"
+trimesh = { version = "*", extras = ["easy"] }
+yourdfpy = "*"
+simple-parsing = "*"
+draccus = "*"
+empy = "==3.3.4"
+catkin-pkg = "*"
+lark-parser = "*"
+transforms3d = "*"
+ruamel-yaml = "*"
+grpcio = "*"
+pytest = "*"
+pre-commit = "*"
+pyserial = "*"
+feetech-servo-sdk = "*"
+
+[target.linux.dependencies]
+libgl-devel = "*"
+
+[environments]
+default = { features = ["build"] }

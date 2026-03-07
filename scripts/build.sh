@@ -10,6 +10,11 @@
 #
 set -e
 
+# Auto-activate pixi environment if pixi is available but env is not active
+if command -v pixi &> /dev/null && [[ -z "${PIXI_PROJECT_ROOT:-}" ]]; then
+    exec pixi run "$0" "$@"
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE="${WORKSPACE:-$(dirname "${SCRIPT_DIR}")}"
 MIXIN_DIR="${WORKSPACE}/colcon/mixin"
@@ -146,24 +151,23 @@ ensure_python_deps() {
     done
 }
 
-setup_venv || true
-ensure_python_deps
+if [[ -z "${PIXI_PROJECT_ROOT:-}" ]]; then
+    setup_venv || true
+    ensure_python_deps
 
-# ============================================================================
-# Install lerobot from libs/
-# ============================================================================
-if [[ -d "${WORKSPACE}/libs/lerobot" ]]; then
-    echo "[INFO] Installing lerobot..."
-    # Use constraints to prevent NumPy 2.x (NGC PyTorch compiled against NumPy 1.x)
-    # and pin tokenizers for transformers compatibility
-    pip install "${WORKSPACE}/libs/lerobot"
-        # --constraint <(echo -e "numpy<2\ntokenizers>=0.21,<0.22") \
+    # Install lerobot from libs/ (pixi manages this via pypi-dependencies)
+    if [[ -d "${WORKSPACE}/libs/lerobot" ]]; then
+        echo "[INFO] Installing lerobot..."
+        pip install "${WORKSPACE}/libs/lerobot"
+    fi
 fi
 
 # ============================================================================
 # ROS 2 Environment
 # ============================================================================
-source /opt/ros/jazzy/setup.bash
+if [[ -f /opt/ros/jazzy/setup.bash ]]; then
+    source /opt/ros/jazzy/setup.bash
+fi
 [[ -f "${WORKSPACE}/install/setup.bash" ]] && source "${WORKSPACE}/install/setup.bash"
 
 # ============================================================================
@@ -192,7 +196,7 @@ echo "════════════════════════�
 
 colcon build \
     --continue-on-error \
-    --parallel-workers "$(nproc)" \
+    --parallel-workers "$(nproc 2>/dev/null || sysctl -n hw.ncpu)" \
     --merge-install \
     --event-handlers console_cohesion+ \
     --base-paths src \

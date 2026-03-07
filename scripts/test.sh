@@ -10,6 +10,11 @@
 #
 set -e
 
+# Auto-activate pixi environment if pixi is available but env is not active
+if command -v pixi &> /dev/null && [[ -z "${PIXI_PROJECT_ROOT:-}" ]]; then
+    exec pixi run "$0" "$@"
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE="${WORKSPACE:-$(dirname "${SCRIPT_DIR}")}"
 MIXIN_DIR="${WORKSPACE}/colcon/mixin"
@@ -45,7 +50,9 @@ done
 # ============================================================================
 # Environment
 # ============================================================================
-source /opt/ros/jazzy/setup.bash
+if [[ -f /opt/ros/jazzy/setup.bash ]]; then
+    source /opt/ros/jazzy/setup.bash
+fi
 [[ -f "${WORKSPACE}/install/setup.bash" ]] && source "${WORKSPACE}/install/setup.bash"
 
 cd "${WORKSPACE}"

@@ -6,3 +6,7 @@ models
 src
 datasets
 logs
+
+# pixi
+.pixi
+pixi.lock
