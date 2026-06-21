@@ -7,6 +7,17 @@ src
 datasets
 logs
 
-# pixi
+# vcs-imported libs (see repos/libs.repos); keep the colcon marker
+libs/*
+!libs/COLCON_IGNORE
+
+# python bytecode
+__pycache__/
+*.pyc
+
+# pixi (lockfile committed for reproducible envs)
 .pixi
-pixi.lock
+# per-environment colcon overlays
+build_vla
+install_vla
+log_vla

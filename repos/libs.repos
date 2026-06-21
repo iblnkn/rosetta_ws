@@ -3,3 +3,11 @@ repositories:
     type: git
     url: https://github.com/iblnkn/lerobot.git
     version: feature/add_obs_similarity_atol
+  vla_foundry:
+    type: git
+    url: https://github.com/TRI-ML/vla_foundry.git
+    version: main
+  starvla:
+    type: git
+    url: https://github.com/starVLA/starVLA.git
+    version: starVLA_dev

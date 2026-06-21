@@ -4,7 +4,7 @@ A ready-to-use devcontainer workspace for **[Rosetta](src/action/rosetta/README.
 
 ## Why This Workspace?
 
-Getting ROS2 and LeRobot installed together is not trivial. This workspace aims to provide an a working example so you can clone, open in VS Code, and get started. 
+Getting ROS2 and LeRobot installed together is not trivial. This workspace is a working example, so you can clone it, open it in VS Code, and get started.
 
 Based on Allison Thackston's excellent [ROS2 VS Code devcontainer template](https://github.com/athackst/vscode_ros2_workspace) ([blog post](https://www.allisonthackston.com/articles/vscode-docker-ros2.html)).
 
@@ -22,6 +22,68 @@ The devcontainer:
 - Mounts credentials from host (HuggingFace, W&B, SSH)
 - Configures GPU access (NVIDIA runtime)
 
+## Policy Backends & Environments
+
+One contract drives **LeRobot**, **TRI vla_foundry**, or **starVLA**. The
+frameworks pin incompatible `torch` versions, so the ROS-side backends live in
+their own pixi environments (sharing the ROS 2 Jazzy base). starVLA's model is
+hosted out-of-process, so its leaf stays in `default`:
+
+| Environment | Stack | Use |
+|---|---|---|
+| `default` | ROS 2 + **LeRobot** (torch 2.10) + **starVLA** client leaf | `pixi run ...` |
+| `vla` | ROS 2 + **vla_foundry** (torch 2.7) | `pixi run -e vla ...` |
+| `starvla` | **starVLA** policy server only (torch 2.6, Linux/CUDA, no ROS) | `pixi run -e starvla ...` |
+
+The LeRobot/vla_foundry environments build their own colcon overlay
+(`install/` vs `install_vla/`):
+
+```bash
+pixi run build           # default overlay -> install/ (lerobot + starvla leaves)
+pixi run -e vla build-vla # vla overlay -> install_vla/
+```
+
+The backend is selected by name. Convert bags to a dataset:
+
+```bash
+pixi run        rosetta_port --backend lerobot --raw-dir ... --contract ... --repo-id ...
+pixi run -e vla rosetta_port --backend vla     --raw-dir ... --contract ... --repo-id ...
+pixi run        rosetta_port --backend starvla --raw-dir ... --contract ... --repo-id ...
+```
+
+Deploy a policy (the client node's `backend` param picks the runner):
+
+```bash
+pixi run        ros2 launch rosetta rosetta_client_launch.py backend:=lerobot ...
+pixi run -e vla ros2 launch rosetta rosetta_client_launch.py backend:=vla \
+                    pretrained_name_or_path:=/path/to/vla_foundry/checkpoint
+```
+
+**starVLA** is split. The dataset writer and the deploy client run in `default`,
+but the model is served by starVLA's own websocket server in the `starvla` env
+(Linux/CUDA). The `starvla` writer emits a LeRobot v3.0 dataset plus a GR00T
+`meta/modality.json` and a paste-ready `rosetta_dataconfig.py`. Training runs
+from the starVLA repo itself (`libs/starvla`). To deploy, start the server on a
+GPU host, then launch the ROS client against it:
+
+```bash
+# one-time, on the GPU host:
+pixi run -e starvla setup-starvla       # installs starVLA's requirements + editable pkg
+#   then install a matching CUDA torch (see pixi.toml [feature.starvla] comment)
+# Rosetta's wrapper normalizes input state server-side (no train/deploy skew):
+PYTHONPATH=libs/starvla pixi run -e starvla python scripts/rosetta_starvla_server.py \
+                    --ckpt_path <checkpoint.pt> --port 10093 --use_bf16
+#   (vision+language-only model? starVLA's stock deployment/model_server/server_policy.py also works.)
+
+# on the robot:
+pixi run ros2 launch rosetta rosetta_client_launch.py backend:=starvla \
+                    server_host:=<gpu-host> server_port:=10093
+```
+
+Backends register under the `rosetta.dataset_writers` / `rosetta.policy_runners`
+entry-point groups; `rosetta` core imports neither framework. Both names appear
+in each environment, but only the env-matching backend is importable.
+
 ## Workspace Structure
 
 ```
@@ -29,11 +91,15 @@ rosetta_ws/
 ├── src/action/              # ROS2 packages (from repos/src.repos)
 │   ├── rosetta/             # Core package - see rosetta/README.md
 │   ├── rosetta_interfaces/  # ROS2 action/service definitions
-│   ├── lerobot_robot_rosetta/
+│   ├── lerobot_robot_rosetta/      # LeRobot backend leaf (default env)
 │   ├── lerobot_teleoperator_rosetta/
+│   ├── vla_foundry_rosetta/        # vla_foundry backend leaf (vla env)
+│   ├── starvla_rosetta/            # starVLA backend leaf (default env; ws client + writer)
 │   └── rosetta_rl/
 ├── libs/                    # Python libraries (from repos/libs.repos)
-│   └── lerobot/             # LeRobot (editable install)
+│   ├── lerobot/             # LeRobot (editable, default env)
+│   ├── vla_foundry/         # TRI vla_foundry (editable, vla env)
+│   └── starvla/             # starVLA (editable, starvla env — server only)
 ├── models/                  # Trained policies
 │   ├── act/
 │   └── pi05/

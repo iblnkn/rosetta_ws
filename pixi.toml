@@ -1,20 +1,25 @@
 [workspace]
 name = "rosetta_ws"
-description = "ROS 2 Jazzy + LeRobot development workspace"
+description = "ROS 2 Jazzy + LeRobot / vla_foundry development workspace"
 channels = ["https://prefix.dev/robostack-jazzy", "https://prefix.dev/conda-forge"]
 platforms = ["linux-64", "osx-arm64", "linux-aarch64"]
 
-# Automatically source the colcon workspace overlay on activation
+# RMW is shared across environments; the colcon overlay is per-environment
+# (each env builds the workspace against its own python), sourced via the
+# feature activation scripts below.
 [target.unix.activation]
-scripts = ["install/setup.bash"]
 env = { RMW_IMPLEMENTATION = "rmw_zenoh_cpp" }
 
 [feature.build.target.unix.tasks]
 setup = "./scripts/setup.sh"
 build = "colcon build --merge-install --symlink-install --continue-on-error --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DBUILD_TESTING=OFF -DPython_FIND_VIRTUALENV=ONLY -DPython3_FIND_VIRTUALENV=ONLY"
+build-vla = "colcon build --merge-install --symlink-install --continue-on-error --build-base build_vla --install-base install_vla --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DBUILD_TESTING=OFF -DPython_FIND_VIRTUALENV=ONLY -DPython3_FIND_VIRTUALENV=ONLY"
 
+# ============================================================================
+# Shared base (conda): ROS 2 Jazzy + build tooling. Used by every environment.
+# ============================================================================
 [dependencies]
-python = ">=3.12"
+python = ">=3.12,<3.13"
 compilers = "*"
 cmake = ">=3.16,<4.0"
 pkg-config = "*"
@@ -50,7 +55,38 @@ ros-jazzy-camera-calibration-parsers = "*"
 # ros-jazzy-slam-toolbox = "*"
 # ros-jazzy-rqt-tf-tree = "*"
 
+[target.linux.dependencies]
+libgl-devel = "*"
+
+# Shared pypi: ROS 2 python build helpers + glue needed by BOTH environments to
+# build/run the rosetta ament_python packages (framework-agnostic).
 [pypi-dependencies]
+empy = "==3.3.4"
+catkin-pkg = "*"
+lark-parser = "*"
+transforms3d = "*"
+ruamel-yaml = "*"
+grpcio = "*"
+pytest = "*"
+# starvla_rosetta leaf: vendored msgpack-numpy websocket client to starVLA's
+# policy server (the leaf never imports starVLA; the model is hosted out-of-process).
+msgpack = "*"
+websockets = "*"
+
+# ============================================================================
+# LeRobot feature: the LeRobot policy backend stack.
+# ============================================================================
+[feature.lerobot.target.unix.activation]
+scripts = ["scripts/overlay_default.sh"]
+
+[feature.lerobot.dependencies]
+# Conda builds of native-lib data/video packages: pip wheels link the system
+# libiconv's `_iconv` symbol, which the conda libiconv (loaded first in-env)
+# lacks -> dlopen crash. Conda builds link the conda libiconv consistently.
+pyarrow = ">=23,<24"
+av = ">=15,<16"
+
+[feature.lerobot.pypi-dependencies]
 lerobot = { path = "libs/lerobot", editable = true }
 torch = "*"
 torchvision = "*"
@@ -72,19 +108,61 @@ trimesh = { version = "*", extras = ["easy"] }
 yourdfpy = "*"
 simple-parsing = "*"
 draccus = "*"
-empy = "==3.3.4"
-catkin-pkg = "*"
-lark-parser = "*"
-transforms3d = "*"
-ruamel-yaml = "*"
-grpcio = "*"
-pytest = "*"
 pre-commit = "*"
 pyserial = "*"
 feetech-servo-sdk = "*"
 
-[target.linux.dependencies]
-libgl-devel = "*"
+# ============================================================================
+# vla_foundry feature: ROS 2 + the TRI vla_foundry backend (no lerobot).
+# Versions (torch==2.7.0, ...) come transitively from vla_foundry's pyproject.
+# ============================================================================
+[feature.vla]
+# vla_foundry's torch==2.7.0 pin lacks linux-aarch64 wheels; restrict platforms.
+platforms = ["linux-64", "osx-arm64"]
+
+[feature.vla.target.unix.activation]
+scripts = ["scripts/overlay_vla.sh"]
+# torch bundles its own libomp; the conda ROS stack also provides one. On macOS
+# the duplicate-load aborts at import. Allow it (Linux deploy targets generally
+# don't hit this; a proper single-libomp fix is the follow-up).
+env = { KMP_DUPLICATE_LIB_OK = "TRUE" }
+
+[feature.vla.dependencies]
+pyarrow = "20.*"
+av = ">=15,<16"
+
+[feature.vla.pypi-dependencies]
+vla_foundry = { path = "libs/vla_foundry", editable = true }
+# vla_foundry preprocessing group (not auto-installed from the editable path)
+pyturbojpeg = "*"
+imageio = { version = "*", extras = ["ffmpeg"] }
+pillow = "*"
+
+# ============================================================================
+# starVLA server feature: a STANDALONE host for starVLA's websocket policy
+# server (deployment/model_server/server_policy.py). NOT a ROS env -- no colcon
+# overlay, no rosetta. The `starvla` policy backend leaf lives in the `default`
+# env and talks to this server over a websocket, so this env only needs to run
+# starVLA's torch-2.6/CUDA stack. Linux/CUDA only (no osx-arm64 wheels).
+#
+# One-time on the GPU host:  pixi run -e starvla setup-starvla
+#   then install a CUDA torch build matching your system, e.g.
+#   pixi run -e starvla pip install torch==2.6.0 torchvision==0.21.0 \
+#       --index-url https://download.pytorch.org/whl/cu124
+# Launch:  pixi run -e starvla python libs/starvla/deployment/model_server/server_policy.py \
+#              --ckpt_path <ckpt.pt> --port 10093 --use_bf16
+# ============================================================================
+[feature.starvla]
+platforms = ["linux-64"]
+
+[feature.starvla.dependencies]
+python = "3.10.*"
+pip = "*"
+
+[feature.starvla.tasks]
+setup-starvla = "pip install -r libs/starvla/requirements.txt && pip install -e libs/starvla"
 
 [environments]
-default = { features = ["build"] }
+default = { features = ["build", "lerobot"] }
+vla = { features = ["build", "vla"] }
+starvla = { features = ["starvla"], no-default-feature = true }
