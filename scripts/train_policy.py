@@ -13,14 +13,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
+r"""
 Train a LeRobot policy with optional multi-GPU and PEFT/LoRA support.
 
 Any unrecognized arguments are forwarded directly to lerobot-train as
 policy overrides (e.g. --policy.chunk_size=50 --policy.dim_model=256).
 
 Examples:
-
   # Train ACT from scratch
   python scripts/train_policy.py --dataset iblnk/data --policy act --repo iblnk/model
 
@@ -39,6 +38,7 @@ Examples:
   # Multi-GPU training
   python scripts/train_policy.py --dataset iblnk/data --policy act --repo iblnk/model \\
       --gpus 2 --precision bf16
+
 """
 
 from __future__ import annotations
@@ -47,9 +47,12 @@ import argparse
 import os
 import shutil
 import sys
+from pathlib import Path
 
 # ── Policy registry ──────────────────────────────────────────────────────────
 
+# Hand-aligned table.
+# fmt: off
 POLICIES: dict[str, dict] = {
     "act":       {"display": "ACT",             "base": None},
     "diffusion": {"display": "DiffusionPolicy", "base": None},
@@ -63,6 +66,7 @@ POLICIES: dict[str, dict] = {
     "vqbet":     {"display": "VQBeT",           "base": None},
     "tdmpc":     {"display": "TDMPC",           "base": None},
 }
+# fmt: on
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -89,13 +93,27 @@ def build_args(ns: argparse.Namespace, passthrough: list[str]) -> list[str]:
     output_dir = ns.output_dir or "outputs/train"
     output_dir = os.path.join(output_dir, display)
 
-    args: list[str] = [
-        f"--dataset.repo_id={ns.dataset}",
+    args: list[str] = []
+    # A local port-bags/convert-bags output (e.g. datasets/lerobot/bee_test) has
+    # no meaningful HF Hub repo_id. Point dataset.root at it directly so
+    # LeRobotDatasetMetadata loads from disk instead of trying to resolve
+    # ns.dataset as a Hub repo id (which errors on paths with '/'-separated
+    # directories and isn't a real repo anyway).
+    dataset_path = Path(ns.dataset)
+    if (dataset_path / "meta" / "info.json").is_file():
+        args.append(f"--dataset.root={dataset_path.resolve()}")
+        args.append(f"--dataset.repo_id={dataset_path.resolve().name}")
+    else:
+        args.append(f"--dataset.repo_id={ns.dataset}")
+
+    args += [
         f"--policy.repo_id={ns.repo}",
         f"--output_dir={output_dir}",
         f"--batch_size={ns.batch_size}",
         f"--steps={ns.steps}",
+        f"--save_freq={ns.save_freq}",
         f"--wandb.enable={str(ns.wandb).lower()}",
+        f"--policy.push_to_hub={str(ns.push_to_hub).lower()}",
     ]
 
     if ns.job_name:
@@ -107,7 +125,7 @@ def build_args(ns: argparse.Namespace, passthrough: list[str]) -> list[str]:
             base = POLICIES[policy]["base"]
             if base is None:
                 print(f"Error: LoRA requires a pretrained model, but '{policy}' has no default.", file=sys.stderr)
-                print(f"Pass --pretrained <path> or use a policy with a base model.", file=sys.stderr)
+                print("Pass --pretrained <path> or use a policy with a base model.", file=sys.stderr)
                 sys.exit(1)
             pretrained = base
 
@@ -143,14 +161,15 @@ def build_command(ns: argparse.Namespace, train_args: list[str]) -> list[str]:
             print("Error: lerobot-train not found on PATH", file=sys.stderr)
             sys.exit(1)
         return [
-            "accelerate", "launch",
+            "accelerate",
+            "launch",
             "--multi_gpu",
             f"--num_processes={ns.gpus}",
             f"--mixed_precision={ns.precision}",
             lerobot_train,
-        ] + train_args
-    else:
-        return ["lerobot-train"] + train_args
+            *train_args,
+        ]
+    return ["lerobot-train", *train_args]
 
 
 def print_summary(ns: argparse.Namespace, cmd: list[str]) -> None:
@@ -177,6 +196,7 @@ def print_summary(ns: argparse.Namespace, cmd: list[str]) -> None:
         print(f"  Pretrained: {pretrained}")
     print(f"  Repo:       {ns.repo}")
     print(f"  Steps:      {ns.steps}")
+    print(f"  Save freq:  {ns.save_freq}")
     print(f"  Batch size: {ns.batch_size}")
     print(f"  GPU:        {gpu_mode}")
     print(f"  W&B:        {ns.wandb}")
@@ -201,20 +221,35 @@ def main() -> int:
     )
 
     # ── Required ─────────────────────────────────────────────────────────
-    parser.add_argument("--dataset", required=True, help="Dataset repo ID (e.g. iblnk/my_data)")
+    parser.add_argument(
+        "--dataset",
+        required=True,
+        help="HF Hub repo ID (e.g. iblnk/my_data) or a local dataset dir (e.g. datasets/lerobot/bee_test)",
+    )
     parser.add_argument("--policy", required=True, choices=POLICIES.keys(), help="Policy architecture")
     parser.add_argument("--repo", required=True, help="HF repo ID for the trained model")
 
     # ── Training config ──────────────────────────────────────────────────
     parser.add_argument("--steps", type=int, default=100_000, help="Training steps (default: 100000)")
     parser.add_argument("--batch-size", type=int, default=8, help="Batch size (default: 8)")
+    parser.add_argument(
+        "--save-freq", type=int, default=10_000, help="Save a checkpoint every N steps (default: 10000)"
+    )
     parser.add_argument("--output-dir", default=None, help="Output directory (default: outputs/train)")
     parser.add_argument("--job-name", default=None, help="Job name for logging")
     parser.add_argument("--wandb", action="store_true", default=False, help="Enable W&B logging")
+    parser.add_argument(
+        "--push-to-hub",
+        action="store_true",
+        default=False,
+        help="Push the trained policy to the HF Hub (default: false; lerobot-train itself defaults this to true)",
+    )
 
     # ── Pretrained / fine-tuning ─────────────────────────────────────────
     parser.add_argument(
-        "--pretrained", default=None, metavar="PATH",
+        "--pretrained",
+        default=None,
+        metavar="PATH",
         help="Pretrained model path or HF repo ID. Use 'default' for the policy's base model.",
     )
 
@@ -225,7 +260,9 @@ def main() -> int:
     # ── GPU ──────────────────────────────────────────────────────────────
     parser.add_argument("--gpus", type=int, default=1, help="Number of GPUs (default: 1)")
     parser.add_argument(
-        "--precision", default="bf16", choices=["fp16", "bf16"],
+        "--precision",
+        default="bf16",
+        choices=["fp16", "bf16"],
         help="Mixed precision mode for multi-GPU (default: bf16)",
     )
 

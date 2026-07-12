@@ -1,21 +1,34 @@
-# colcon/defaults.yaml - Workspace-wide colcon defaults
-# These are applied automatically to all colcon commands run in this workspace
+# .colcon/defaults.yaml — workspace-wide colcon defaults.
+#
+# Applied automatically to every colcon invocation in this workspace: pixi
+# activation exports COLCON_DEFAULTS_FILE pointing here, so `pixi run build`,
+# bare `colcon build` inside `pixi shell`, VS Code tasks, Docker, and CI all
+# share one config. Task definitions in pixi.toml stay one-liners.
+#
 # See: https://colcon.readthedocs.io/en/released/user/configuration.html
 
 build:
-  # Always use merge-install for simpler environment
+  # Single merged install/ tree (simpler overlay sourcing + gdb paths)
   merge-install: true
-  
-  # Parallel workers (comment out to use all cores)
-  # parallel-workers: 8
-  
-  # Event handlers for build output
+
+  # Symlink python sources into install/ so edits apply without rebuilding
+  symlink-install: true
+
+  # Cohesive per-package output
   event-handlers:
     - console_cohesion+
-  
-  # Base paths for source
+
+  # Only scan src/ for packages (libs/ holds plain python repos)
   base-paths:
     - src
+
+  # Note: passing --cmake-args on the CLI replaces this list wholesale —
+  # restate the Python_FIND flags if you override (see build-with-tests).
+  cmake-args:
+    - -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+    - -DBUILD_TESTING=OFF
+    - -DPython_FIND_VIRTUALENV=ONLY
+    - -DPython3_FIND_VIRTUALENV=ONLY
 
 test:
   merge-install: true

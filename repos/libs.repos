@@ -1,13 +1,10 @@
 repositories:
+  # Stock upstream lerobot at the v0.6.0 release. The obs_similarity_atol
+  # delta lives on the local branch feature/add_obs_similarity_atol (rebased
+  # onto v0.6.0, PR-ready); until it lands upstream, the async-inference
+  # obs-similarity filter is hardcoded on (atol 1.0) in stock lerobot — see
+  # params/rosetta_client.yaml.
   lerobot:
     type: git
-    url: https://github.com/iblnkn/lerobot.git
-    version: feature/add_obs_similarity_atol
-  vla_foundry:
-    type: git
-    url: https://github.com/TRI-ML/vla_foundry.git
-    version: main
-  starvla:
-    type: git
-    url: https://github.com/starVLA/starVLA.git
-    version: starVLA_dev
+    url: https://github.com/huggingface/lerobot.git
+    version: v0.6.0

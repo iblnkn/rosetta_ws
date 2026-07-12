@@ -1,22 +1,112 @@
 [workspace]
 name = "rosetta_ws"
-description = "ROS 2 Jazzy + LeRobot / vla_foundry development workspace"
+description = "ROS 2 Jazzy + LeRobot development workspace"
 channels = ["https://prefix.dev/robostack-jazzy", "https://prefix.dev/conda-forge"]
 platforms = ["linux-64", "osx-arm64", "linux-aarch64"]
 
-# RMW is shared across environments; the colcon overlay is per-environment
-# (each env builds the workspace against its own python), sourced via the
-# feature activation scripts below.
+# Colcon reads its workspace-wide config (merge-install, symlink-install,
+# cmake-args, base-paths) from .colcon/defaults.yaml, so every task below and
+# any bare `colcon` call inside `pixi shell` behave identically.
+[activation.env]
+COLCON_DEFAULTS_FILE = "${PIXI_PROJECT_ROOT}/.colcon/defaults.yaml"
+
 [target.unix.activation]
 env = { RMW_IMPLEMENTATION = "rmw_zenoh_cpp" }
 
-[feature.build.target.unix.tasks]
-setup = "./scripts/setup.sh"
-build = "colcon build --merge-install --symlink-install --continue-on-error --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DBUILD_TESTING=OFF -DPython_FIND_VIRTUALENV=ONLY -DPython3_FIND_VIRTUALENV=ONLY"
-build-vla = "colcon build --merge-install --symlink-install --continue-on-error --build-base build_vla --install-base install_vla --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DBUILD_TESTING=OFF -DPython_FIND_VIRTUALENV=ONLY -DPython3_FIND_VIRTUALENV=ONLY"
+# ============================================================================
+# Tasks (default feature: available in the default and ci environments).
+# `default-environment` routes each task to the right env, so plain
+# `pixi run <task>` does the right thing without -e.
+# Extra CLI args are appended: `pixi run build --packages-select rosetta`.
+# ============================================================================
+
+[tasks.build]
+description = "colcon build -> install/ (flags come from .colcon/defaults.yaml)"
+default-environment = "default"
+cmd = "colcon build"
+inputs = ["src", ".colcon"]
+
+[tasks.build-with-tests]
+description = "colcon build with BUILD_TESTING enabled (restates the defaults.yaml cmake-args, which a CLI --cmake-args replaces wholesale)"
+default-environment = "default"
+cmd = "colcon build --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DBUILD_TESTING=ON -DPython_FIND_VIRTUALENV=ONLY -DPython3_FIND_VIRTUALENV=ONLY"
+inputs = ["src", ".colcon"]
+
+[tasks.test]
+description = "colcon test + report (fails the task if any test fails)"
+default-environment = "default"
+cmd = "colcon test && colcon test-result --verbose"
+
+[tasks.clean]
+description = "Remove colcon build/install/log directories"
+default-environment = "default"
+cmd = "rm -rf build install log"
+
+[tasks.lint]
+description = "ruff over package + workspace python; pre-commit hooks over workspace files"
+default-environment = "default"
+# ruff covers src/action (vcs-imported package repos, invisible to this repo's
+# pre-commit) using the workspace ruff.toml; pre-commit covers the files the
+# workspace repo itself tracks (scripts, yaml, shell). Same layering as pai_ws,
+# adapted to the multi-repo src/ layout.
+cmd = "ruff check src/action scripts && ruff format --check src/action && pre-commit run --all-files"
+
+[tasks.export-repos]
+description = "Pin current checkouts back into repos/*.repos"
+default-environment = "default"
+cmd = "vcs export src > repos/src.repos && vcs export libs > repos/libs.repos"
+
+[tasks._register-mixins]
+description = "Register the workspace-local colcon mixin index (debug, release, asan, ...)"
+default-environment = "default"
+# Tasks run from the project root, so $(pwd) anchors the file:// URL.
+# `mixin add` errors if the name already exists; `|| true` makes re-runs
+# idempotent. `update` always follows to pull the current mixin set.
+cmd = "colcon mixin add rosetta file://$(pwd)/.colcon/mixin/index.yaml 2>/dev/null || true && colcon mixin update rosetta"
+
+[tasks.start-zenoh]
+description = "Start the Zenoh RMW router (run in its own terminal, leave running)"
+default-environment = "default"
+cmd = "ros2 run rmw_zenoh_cpp rmw_zenohd"
 
 # ============================================================================
-# Shared base (conda): ROS 2 Jazzy + build tooling. Used by every environment.
+# Bootstrap feature: a tiny env usable BEFORE libs/ exists. The default env
+# cannot solve on a fresh clone (lerobot is an editable path dep
+# under libs/), so setup imports the repos from this env first, then installs
+# the default env.
+#
+# NOTE: on a fresh clone this must run as `pixi run --frozen setup` — without
+# --frozen, pixi validates the whole lockfile first, which canonicalizes the
+# libs/* editable paths that don't exist yet. --frozen is safe here: the lock
+# is exactly what the clone shipped.
+# ============================================================================
+[feature.bootstrap.dependencies]
+git = "*"
+vcstool = "*"
+
+[feature.bootstrap.tasks._vcs-import-libs]
+description = "Clone python libraries (lerobot) into libs/"
+default-environment = "bootstrap"
+cmd = "mkdir -p libs && vcs import libs --input repos/libs.repos --recursive && touch libs/COLCON_IGNORE"
+
+[feature.bootstrap.tasks._vcs-import-src]
+description = "Clone the ROS package repos into src/"
+default-environment = "bootstrap"
+cmd = "mkdir -p src && vcs import src --input repos/src.repos --recursive"
+
+[feature.bootstrap.tasks.setup]
+description = "Fresh-clone setup: import repos, install the default env, register colcon mixins"
+default-environment = "bootstrap"
+depends-on = ["_vcs-import-libs", "_vcs-import-src"]
+# --frozen: install exactly the lock that shipped with the clone (no re-solve;
+# pixi's up-to-date check also mis-reads lerobot's [tool.uv.sources] pin).
+# -e default explicitly: the nested `pixi run` inherits this task's bootstrap
+# env context and can't resolve the task's environment on its own.
+cmd = "pixi install -e default --frozen && pixi run --frozen -e default _register-mixins && echo 'Setup complete. Next: pixi run build'"
+
+# ============================================================================
+# Shared base (conda): ROS 2 Jazzy + build tooling. Used by every environment
+# except bootstrap (no-default-feature).
 # ============================================================================
 [dependencies]
 python = ">=3.12,<3.13"
@@ -27,8 +117,14 @@ make = "*"
 ninja = "*"
 rosdep = "*"
 colcon-common-extensions = "*"
+colcon-mixin = "*"
 vcstool = "*"
+ruff = "*"
+pre-commit = "*"
 packaging = ">=24.2,<26.0"
+# <9.1: launch_testing's pytest plugin still uses the `path` hook argument
+# that pytest 9.1 removed (plugin validation error at collection otherwise).
+pytest = "<9.1"
 
 # ROS 2 Jazzy
 ros-jazzy-desktop = "*"
@@ -42,18 +138,15 @@ ros-jazzy-teleop-twist-joy = "*"
 ros-jazzy-joy = "*"
 ros-jazzy-ament-cmake-vendor-package = ">=2.5.4,<3"
 ros-jazzy-camera-calibration-parsers = "*"
-
-# These may or may not be available on robostack-jazzy for all platforms.
-# Comment out any that fail to resolve.
-# ros-jazzy-ros2-control = "*"
-# ros-jazzy-ros2-controllers = "*"
-# ros-jazzy-xacro = "*"
-# ros-jazzy-joint-state-publisher-gui = "*"
-# ros-jazzy-camera-info-manager = "*"
-# ros-jazzy-foxglove-bridge = "*"
-# ros-jazzy-robot-localization = "*"
-# ros-jazzy-slam-toolbox = "*"
-# ros-jazzy-rqt-tf-tree = "*"
+# Operator tooling (resolves on all three platforms)
+ros-jazzy-foxglove-bridge = "*"
+# ament linters: the lint task + the packages' test_depends
+ros-jazzy-ament-flake8 = "*"
+ros-jazzy-ament-pep257 = "*"
+ros-jazzy-ament-xmllint = "*"
+ros-jazzy-ament-copyright = "*"
+ros-jazzy-ament-lint-auto = "*"
+ros-jazzy-ament-lint-common = "*"
 
 [target.linux.dependencies]
 libgl-devel = "*"
@@ -67,9 +160,7 @@ lark-parser = "*"
 transforms3d = "*"
 ruamel-yaml = "*"
 grpcio = "*"
-pytest = "*"
-# starvla_rosetta leaf: vendored msgpack-numpy websocket client to starVLA's
-# policy server (the leaf never imports starVLA; the model is hosted out-of-process).
+# Websocket/serialization glue used by optional in-tree leaf packages.
 msgpack = "*"
 websockets = "*"
 
@@ -77,7 +168,7 @@ websockets = "*"
 # LeRobot feature: the LeRobot policy backend stack.
 # ============================================================================
 [feature.lerobot.target.unix.activation]
-scripts = ["scripts/overlay_default.sh"]
+scripts = ["scripts/activate.sh"]
 
 [feature.lerobot.dependencies]
 # Conda builds of native-lib data/video packages: pip wheels link the system
@@ -85,84 +176,65 @@ scripts = ["scripts/overlay_default.sh"]
 # lacks -> dlopen crash. Conda builds link the conda libiconv consistently.
 pyarrow = ">=23,<24"
 av = ">=15,<16"
+# lerobot 0.6.0 pins numpy>=2.0,<2.3; the ROS stack otherwise floats to 2.4.
+numpy = ">=2.2,<2.3"
 
 [feature.lerobot.pypi-dependencies]
-lerobot = { path = "libs/lerobot", editable = true }
+# Extras supply what used to be explicit dup entries here: dataset
+# (datasets/av/pyarrow/torchcodec/jsonlines), async (grpcio/matplotlib),
+# training (wandb/accelerate), peft (transformers>=5.4/peft for LoRA).
+lerobot = { path = "libs/lerobot", editable = true, extras = ["dataset", "async", "training", "peft", "smolvla"] }
 torch = "*"
 torchvision = "*"
 torchaudio = "*"
 scipy = "*"
 scikit-learn = "*"
-datasets = "*"
 einops = "*"
-wandb = "*"
 gymnasium = "*"
 imageio = { version = "*", extras = ["ffmpeg"] }
 opencv-python-headless = "*"
 diffusers = ">=0.27"
-transformers = ">=4.40"
-accelerate = ">=0.30"
-huggingface-hub = { version = "*", extras = ["cli"] }
+# huggingface-hub >= 1.0 ships the CLI in the base package (no 'cli' extra).
+huggingface-hub = "*"
 hf-transfer = "*"
 trimesh = { version = "*", extras = ["easy"] }
 yourdfpy = "*"
 simple-parsing = "*"
 draccus = "*"
-pre-commit = "*"
 pyserial = "*"
 feetech-servo-sdk = "*"
 
-# ============================================================================
-# vla_foundry feature: ROS 2 + the TRI vla_foundry backend (no lerobot).
-# Versions (torch==2.7.0, ...) come transitively from vla_foundry's pyproject.
-# ============================================================================
-[feature.vla]
-# vla_foundry's torch==2.7.0 pin lacks linux-aarch64 wheels; restrict platforms.
-platforms = ["linux-64", "osx-arm64"]
+# ---- LeRobot ML workflow tasks ----
 
-[feature.vla.target.unix.activation]
-scripts = ["scripts/overlay_vla.sh"]
-# torch bundles its own libomp; the conda ROS stack also provides one. On macOS
-# the duplicate-load aborts at import. Allow it (Linux deploy targets generally
-# don't hit this; a proper single-libomp fix is the follow-up).
-env = { KMP_DUPLICATE_LIB_OK = "TRUE" }
+[feature.lerobot.tasks.convert-bags]
+description = "Convert ROS2 bags to a LeRobot dataset (append --raw-dir/--contract/--repo-id/--root)"
+default-environment = "default"
+cmd = "python -m rosetta.robots.ros2.offline.port"
 
-[feature.vla.dependencies]
-pyarrow = "20.*"
-av = ">=15,<16"
+[feature.lerobot.tasks.convert-bags-parallel]
+description = "Sharded parallel bag conversion (args: bags-dir contract repo-id root num-shards)"
+default-environment = "default"
+cmd = "./scripts/convert_bags_parallel.sh"
 
-[feature.vla.pypi-dependencies]
-vla_foundry = { path = "libs/vla_foundry", editable = true }
-# vla_foundry preprocessing group (not auto-installed from the editable path)
-pyturbojpeg = "*"
-imageio = { version = "*", extras = ["ffmpeg"] }
-pillow = "*"
+[feature.lerobot.tasks.train]
+description = "Train a LeRobot policy (see scripts/train_policy.py --help)"
+default-environment = "default"
+cmd = "python scripts/train_policy.py"
+env = { PYTORCH_CUDA_ALLOC_CONF = "expandable_segments:True" }
+
+[feature.lerobot.tasks.resume-train]
+description = "Resume training from a checkpoint (append --config_path=...)"
+default-environment = "default"
+cmd = "lerobot-train --resume=true"
+env = { PYTORCH_CUDA_ALLOC_CONF = "expandable_segments:True" }
 
 # ============================================================================
-# starVLA server feature: a STANDALONE host for starVLA's websocket policy
-# server (deployment/model_server/server_policy.py). NOT a ROS env -- no colcon
-# overlay, no rosetta. The `starvla` policy backend leaf lives in the `default`
-# env and talks to this server over a websocket, so this env only needs to run
-# starVLA's torch-2.6/CUDA stack. Linux/CUDA only (no osx-arm64 wheels).
-#
-# One-time on the GPU host:  pixi run -e starvla setup-starvla
-#   then install a CUDA torch build matching your system, e.g.
-#   pixi run -e starvla pip install torch==2.6.0 torchvision==0.21.0 \
-#       --index-url https://download.pytorch.org/whl/cu124
-# Launch:  pixi run -e starvla python libs/starvla/deployment/model_server/server_policy.py \
-#              --ckpt_path <ckpt.pt> --port 10093 --use_bf16
+# CI feature: torch-free ROS build (COPY instead of symlink install).
 # ============================================================================
-[feature.starvla]
-platforms = ["linux-64"]
-
-[feature.starvla.dependencies]
-python = "3.10.*"
-pip = "*"
-
-[feature.starvla.tasks]
-setup-starvla = "pip install -r libs/starvla/requirements.txt && pip install -e libs/starvla"
+[feature.ci.activation.env]
+CMAKE_INSTALL_MODE = "COPY"
 
 [environments]
-default = { features = ["build", "lerobot"] }
-vla = { features = ["build", "vla"] }
-starvla = { features = ["starvla"], no-default-feature = true }
+default = { features = ["lerobot"] }
+bootstrap = { features = ["bootstrap"], no-default-feature = true }
+ci = { features = ["ci"] }

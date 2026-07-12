@@ -1,0 +1,17 @@
+// Workspace-level extension recommendations. VS Code prompts users who open
+// this folder (without a devcontainer) to install these. The devcontainer
+// under .devcontainer/x86/ installs the same list automatically.
+{
+    "recommendations": [
+        "renan-r-santos.pixi-code",
+        "ranch-hand-robotics.rde-pack",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-vscode.cpptools",
+        "ms-vscode.cmake-tools",
+        "eamodio.gitlens",
+        "usernamehw.errorlens",
+        "redhat.vscode-yaml",
+        "smilerobotics.urdf"
+    ]
+}

@@ -1,275 +1,187 @@
 # rosetta_ws
 
-A ready-to-use devcontainer workspace for **[Rosetta](src/action/rosetta/README.md)**, the ROS2 to LeRobot bridge.
+The [pixi](https://pixi.sh)-powered workspace for **[Rosetta](src/action/rosetta/README.md)**,
+the ROS2 to LeRobot bridge.
 
 ## Why This Workspace?
 
-Getting ROS2 and LeRobot installed together is not trivial. This workspace is a working example, so you can clone it, open it in VS Code, and get started.
-
-Based on Allison Thackston's excellent [ROS2 VS Code devcontainer template](https://github.com/athackst/vscode_ros2_workspace) ([blog post](https://www.allisonthackston.com/articles/vscode-docker-ros2.html)).
+Getting ROS2 and LeRobot installed together is not trivial — the ML frameworks
+pin incompatible torch versions and the ROS python stack has its own numpy and
+opencv opinions. This workspace resolves all of it into committed, reproducible
+[pixi](https://pixi.sh) environments: one `pixi run setup` gives you ROS 2
+Jazzy (via [RoboStack](https://robostack.github.io/)), LeRobot, and every tool
+the workflow needs — no Docker, no system ROS, no venv juggling.
 
 ## Quick Start
+
+Install pixi ([one-liner](https://pixi.sh/latest/#installation), v0.72+), then:
 
 ```bash
 git clone https://github.com/iblnkn/rosetta_ws.git
 cd rosetta_ws
-code .  # VS Code: "Reopen in Container"
+pixi run --frozen setup    # clone package/library repos + install the default env
+pixi run build             # colcon build -> install/
+pixi run ros2 launch rosetta rosetta_client_launch.py
 ```
 
-The devcontainer:
-- Installs ROS2, LeRobot, and all dependencies
-- Builds and sources the workspace
-- Mounts credentials from host (HuggingFace, W&B, SSH)
-- Configures GPU access (NVIDIA runtime)
+(`--frozen` is only needed for that first `setup`: until it clones `libs/`,
+pixi can't validate the lockfile's editable path dependencies. Every later
+command is just `pixi run ...`.)
 
-## Policy Backends & Environments
+`pixi shell` drops you into an activated environment (ROS sourced, overlay
+sourced, Zenoh RMW selected) for interactive work.
 
-One contract drives **LeRobot**, **TRI vla_foundry**, or **starVLA**. The
-frameworks pin incompatible `torch` versions, so the ROS-side backends live in
-their own pixi environments (sharing the ROS 2 Jazzy base). starVLA's model is
-hosted out-of-process, so its leaf stays in `default`:
+### Tab completion
+
+Two one-time additions to `~/.bashrc` (zsh users: `pixi completion --shell
+zsh` and argcomplete's zsh hooks are the equivalents):
+
+```bash
+# pixi itself: subcommands, and task names for `pixi run <TAB>`
+eval "$(pixi completion --shell bash)"
+
+# ros2/colcon argument completion (subcommands, packages, launch files),
+# registered lazily on the first TAB press. Eager registration here won't
+# work: `pixi shell` sources ~/.bashrc BEFORE activating the env, so
+# register-python-argcomplete isn't on PATH yet at rc time. The stub looks
+# it up at completion time instead, swaps in the real argcomplete hook, and
+# re-dispatches — outside the env it returns 1 and you get plain filename
+# completion.
+_pixi_lazy_argcomplete() {
+  local reg realfn
+  reg=$(command -v register-python-argcomplete) || return 1
+  eval "$("$reg" "$1")"
+  realfn=$(complete -p "$1" 2>/dev/null | sed -E 's/.*-F ([^ ]+).*/\1/')
+  [ -n "$realfn" ] && [ "$realfn" != "_pixi_lazy_argcomplete" ] && "$realfn" "$@"
+}
+complete -o nospace -o bashdefault -o default -F _pixi_lazy_argcomplete ros2 colcon
+```
+
+Know what each layer can and can't complete:
+
+- `pixi run <TAB>` completes **pixi task names only** (`build`, `test`,
+  `start-zenoh`, ...). It will never complete env binaries like `ros2`, and it
+  can't complete their arguments either — argcomplete has to run the target
+  command in a shell where the environment is active, which is never true for
+  the outer shell driving `pixi run`.
+- For `ros2 launch <pkg><TAB>` and friends, work inside **`pixi shell`** —
+  with the stub above, full ros2/colcon completion works there.
+
+Notes: argcomplete ships with the env, so nothing extra needs installing.
+Registering from a pixi activation script doesn't work either — activation
+propagates environment variables, not interactive shell hooks. And
+argcomplete's `activate-global-python-argcomplete` hook is a dead end here:
+RoboStack's `ros2`/`colcon` entry-point scripts lack the
+`PYTHON_ARGCOMPLETE_OK` marker it keys on. See
+[pixi#2366](https://github.com/prefix-dev/pixi/issues/2366) for background.
+
+Prefer a container? The devcontainer (below) is a thin wrapper that runs the
+exact same `pixi run setup`. Want the packages without pixi at all? See
+[docs/NON_PIXI.md](docs/NON_PIXI.md).
+
+## Environments
 
 | Environment | Stack | Use |
 |---|---|---|
-| `default` | ROS 2 + **LeRobot** (torch 2.10) + **starVLA** client leaf | `pixi run ...` |
-| `vla` | ROS 2 + **vla_foundry** (torch 2.7) | `pixi run -e vla ...` |
-| `starvla` | **starVLA** policy server only (torch 2.6, Linux/CUDA, no ROS) | `pixi run -e starvla ...` |
+| `default` | ROS 2 Jazzy + **LeRobot** (torch 2.10) | `pixi run ...` — daily driver |
+| `ci` | ROS 2 only (torch-free, COPY install) | CI builds |
+| `bootstrap` | vcstool + git only | powers `pixi run setup` on a fresh clone |
 
-The LeRobot/vla_foundry environments build their own colcon overlay
-(`install/` vs `install_vla/`):
-
-```bash
-pixi run build           # default overlay -> install/ (lerobot + starvla leaves)
-pixi run -e vla build-vla # vla overlay -> install_vla/
-```
-
-The backend is selected by name. Convert bags to a dataset:
+Convert bags to a dataset and deploy a policy:
 
 ```bash
-pixi run        rosetta_port --backend lerobot --raw-dir ... --contract ... --repo-id ...
-pixi run -e vla rosetta_port --backend vla     --raw-dir ... --contract ... --repo-id ...
-pixi run        rosetta_port --backend starvla --raw-dir ... --contract ... --repo-id ...
-```
-
-Deploy a policy (the client node's `backend` param picks the runner):
-
-```bash
-pixi run        ros2 launch rosetta rosetta_client_launch.py backend:=lerobot ...
-pixi run -e vla ros2 launch rosetta rosetta_client_launch.py backend:=vla \
-                    pretrained_name_or_path:=/path/to/vla_foundry/checkpoint
-```
-
-**starVLA** is split. The dataset writer and the deploy client run in `default`,
-but the model is served by starVLA's own websocket server in the `starvla` env
-(Linux/CUDA). The `starvla` writer emits a LeRobot v3.0 dataset plus a GR00T
-`meta/modality.json` and a paste-ready `rosetta_dataconfig.py`. Training runs
-from the starVLA repo itself (`libs/starvla`). To deploy, start the server on a
-GPU host, then launch the ROS client against it:
-
-```bash
-# one-time, on the GPU host:
-pixi run -e starvla setup-starvla       # installs starVLA's requirements + editable pkg
-#   then install a matching CUDA torch (see pixi.toml [feature.starvla] comment)
-# Rosetta's wrapper normalizes input state server-side (no train/deploy skew):
-PYTHONPATH=libs/starvla pixi run -e starvla python scripts/rosetta_starvla_server.py \
-                    --ckpt_path <checkpoint.pt> --port 10093 --use_bf16
-#   (vision+language-only model? starVLA's stock deployment/model_server/server_policy.py also works.)
-
-# on the robot:
-pixi run ros2 launch rosetta rosetta_client_launch.py backend:=starvla \
-                    server_host:=<gpu-host> server_port:=10093
+pixi run convert-bags --raw-dir ... --contract ... --repo-id ...
+pixi run ros2 launch rosetta rosetta_client_launch.py backend:=lerobot ...
 ```
 
 Backends register under the `rosetta.dataset_writers` / `rosetta.policy_runners`
-entry-point groups; `rosetta` core imports neither framework. Both names appear
-in each environment, but only the env-matching backend is importable.
+entry-point groups; `rosetta` core imports no ML framework directly.
+
+> Additional experimental backends (TRI vla_foundry, starVLA) and their pixi
+> environments live on the `vla-starvla-backends` branch until they stabilize.
+
+## Tasks
+
+Everything routes through pixi tasks (`pixi task list` shows all of them; the
+VS Code tasks in `.vscode/tasks.json` are one-line wrappers around these):
+
+| Task | Env | Description |
+|---|---|---|
+| `setup` | bootstrap | Fresh-clone setup: `vcs import` + `pixi install` + colcon mixins (run with `--frozen` the first time) |
+| `build` | default | colcon build → `install/` |
+| `build-with-tests` | default | build with `BUILD_TESTING=ON` |
+| `test` | default | `colcon test` + result report |
+| `clean` | default | remove build/install/log |
+| `lint` | default | ruff (`ruff.toml`) over `src/action` + `scripts`; pre-commit hooks over workspace files |
+| `start-zenoh` | default | Zenoh RMW router (own terminal, leave running) |
+| `convert-bags` / `convert-bags-parallel` | default | bag → LeRobot dataset conversion |
+| `train` / `resume-train` | default | LeRobot policy training (`scripts/train_policy.py`) |
+| `export-repos` | default | pin current checkouts back into `repos/*.repos` |
+
+Colcon behavior (merge-install, symlink-install, cmake-args, `base-paths: src`)
+is centralized in [`.colcon/defaults.yaml`](.colcon/defaults.yaml), activated
+via `COLCON_DEFAULTS_FILE` — so a bare `colcon build` inside `pixi shell`
+behaves exactly like `pixi run build`. Extra args pass straight through:
+`pixi run build --packages-select rosetta`, `pixi run build --mixin debug`
+(mixins come from `.colcon/mixin/`, registered by `setup`).
 
 ## Workspace Structure
 
 ```
 rosetta_ws/
+├── pixi.toml                # THE environment definition (envs, deps, tasks)
+├── pixi.lock                # committed lockfile — reproducible everywhere
+├── .colcon/                 # colcon defaults + local mixins
 ├── src/action/              # ROS2 packages (from repos/src.repos)
 │   ├── rosetta/             # Core package - see rosetta/README.md
 │   ├── rosetta_interfaces/  # ROS2 action/service definitions
-│   ├── lerobot_robot_rosetta/      # LeRobot backend leaf (default env)
-│   ├── lerobot_teleoperator_rosetta/
-│   ├── vla_foundry_rosetta/        # vla_foundry backend leaf (vla env)
-│   ├── starvla_rosetta/            # starVLA backend leaf (default env; ws client + writer)
-│   └── rosetta_rl/
-├── libs/                    # Python libraries (from repos/libs.repos)
-│   ├── lerobot/             # LeRobot (editable, default env)
-│   ├── vla_foundry/         # TRI vla_foundry (editable, vla env)
-│   └── starvla/             # starVLA (editable, starvla env — server only)
+│   ├── lerobot_robot_rosetta/        # LeRobot backend leaf
+│   └── lerobot_teleoperator_rosetta/
+├── libs/                    # Python libraries (from repos/libs.repos, editable installs)
+│   └── lerobot/             # LeRobot
 ├── models/                  # Trained policies
-│   ├── act/
-│   └── pi05/
-├── datasets/
-│   ├── bags/                # Raw rosbag recordings
-│   └── lerobot/             # Converted LeRobot datasets
-├── repos/                   # VCS import definitions
-│   ├── src.repos            # ROS2 package sources
-│   └── libs.repos           # Python library sources
-├── scripts/                 # Build and workflow scripts
-├── docker/                  # Dockerfiles (x86, Jetson)
-└── .devcontainer/           # VS Code devcontainer configs
-    ├── x86/
-    └── jetson/
+├── datasets/                # bags/ (recordings) + lerobot/ (converted datasets)
+├── repos/                   # vcs import manifests (src.repos, libs.repos)
+├── scripts/                 # activation script + ML workflow implementations
+├── docker/                  # Toolchain-only devcontainer image
+└── .devcontainer/x86/       # VS Code devcontainer (thin wrapper: mounts workspace, runs pixi)
 ```
 
-## Directories
+`src/action` packages and `libs/` libraries are each their own git repo,
+imported by `pixi run setup`; `repos/*.repos` pins what a fresh clone gets
+(`pixi run export-repos` updates the pins). `libs/COLCON_IGNORE` keeps colcon
+out of the python libraries.
 
-### `src/action/`
+## Devcontainer (optional)
 
-ROS2 packages. Currently embedded in the workspace for development. In production, these will be pulled from separate repositories via `repos/src.repos`:
+Open in VS Code → "Reopen in Container". The image
+([docker/Dockerfile](docker/Dockerfile)) is toolchain-only — CUDA, pixi, and
+X11 client libs; no source, no dependencies, no build baked in.
+`postCreateCommand` runs the same `pixi run setup` as the host path, into the
+bind-mounted workspace:
 
-```yaml
-# repos/src.repos (not yet active)
-repositories:
-  action/rosetta:
-    type: git
-    url: https://github.com/iblnkn/rosetta.git
-    version: main
-```
+- `src/` and `libs/` live on the **host** (the workspace folder is a bind
+  mount), so branches and uncommitted work persist across container rebuilds.
+- `.pixi` lives in a named volume, so the installed environments survive
+  rebuilds too. Rebuilding the image only refreshes the toolchain.
+- Credentials (`~/.cache/huggingface`, `~/.config/wandb`, `~/.netrc`, `~/.ssh`)
+  are mounted from the host — log in with `hf auth login` / `wandb login` on
+  the host first.
 
-For documentation on the packages themselves, see [rosetta/README.md](src/action/rosetta/README.md).
+## Contributing notes
 
-### `libs/`
-
-Python libraries installed in editable mode. LeRobot is cloned here so you can modify it if needed.
-
-```yaml
-# repos/libs.repos
-repositories:
-  lerobot:
-    type: git
-    url: https://github.com/huggingface/lerobot.git
-    version: main
-```
-
-The `COLCON_IGNORE` file prevents colcon from treating this as a ROS2 package.
-
-### `models/`
-
-Store trained policies here. Organized by policy type:
-
-```
-models/
-├── act/
-│   └── act_pen_in_cup/
-│       └── 050000/
-│           └── pretrained_model/
-└── pi05/
-    └── my_pi05_policy/
-```
-
-Reference in launch files:
-```bash
-ros2 launch rosetta rosetta_client_launch.py \
-    pretrained_name_or_path:=/workspaces/rosetta_ws/models/act/my_policy/pretrained_model
-```
-
-Or upload to HuggingFace Hub and reference by repo ID.
-
-### `datasets/`
-
-Two subdirectories for the recording → training pipeline:
-
-| Directory | Contents | Created By |
-|-----------|----------|------------|
-| `datasets/bags/` | Raw rosbag2 recordings (MCAP) | Episode Recorder |
-| `datasets/lerobot/` | Converted LeRobot datasets | `port_bags.py` |
-
-**Workflow:**
-1. Record episodes → `datasets/bags/my_robot_YYYYMMDD_HHMMSS/`
-2. Convert → `datasets/lerobot/my_dataset/`
-3. Train → `models/act/my_policy/`
-
-### `repos/`
-
-VCS import files for `vcs import`. To pull external sources:
-
-```bash
-vcs import src < repos/src.repos
-vcs import libs < repos/libs.repos
-```
-
-Currently commented out since packages are embedded for development.
-
-### `scripts/`
-
-Workflow automation scripts:
-
-| Script | Description |
-|--------|-------------|
-| `build.sh` | Build workspace with colcon |
-| `setup.sh` | First-time setup (rosdep, pip installs) |
-| `convert_bags_parallel.sh` | Parallel bag-to-dataset conversion |
-| `train_policy.sh` | Training with policy selection and multi-GPU |
-| `test.sh` | Run tests |
-
-## Docker
-
-Two Dockerfiles for different platforms:
-
-| File | Platform | Base Image |
-|------|----------|------------|
-| `docker/Dockerfile.x86` | x86_64 with NVIDIA GPU | `nvidia/cuda:12.x` + ROS2 |
-| `docker/Dockerfile.jetson` | NVIDIA Jetson (ARM64) | `dustynv/ros:jazzy-...` |
-
-### Devcontainer (Recommended)
-
-Open in VS Code and select "Reopen in Container". The devcontainer:
-- Uses the appropriate Dockerfile for your platform
-- Mounts the workspace at `/workspaces/rosetta_ws`
-- Shares credentials from host (`~/.cache/huggingface`, `~/.config/wandb`, `~/.ssh`)
-- Enables GPU passthrough
-
-## VS Code Tasks
-
-The workspace includes pre-configured tasks (`.vscode/tasks.json`):
-
-| Task | Description |
-|------|-------------|
-| `build` | Build with colcon |
-| `convert bags to lerobot` | Convert recordings to dataset |
-| `convert bags to lerobot (parallel)` | Parallel conversion (faster) |
-| `train policy` | Interactive policy training |
-| `resume training` | Resume from checkpoint |
-| `upload trained policy` | Push to HuggingFace Hub |
-
-Access via `Ctrl+Shift+P` → "Tasks: Run Task".
-
-## Credentials
-
-The devcontainer mounts credentials from your host machine:
-
-| Host Path | Container Path | Purpose |
-|-----------|----------------|---------|
-| `~/.cache/huggingface` | `/home/ros/.cache/huggingface` | HuggingFace Hub token |
-| `~/.config/wandb` | `/home/ros/.config/wandb` | Weights & Biases |
-| `~/.netrc` | `/home/ros/.netrc` | Git credentials |
-| `~/.ssh` | `/home/ros/.ssh` | SSH keys (read-only) |
-
-Login on your host before opening the container:
-```bash
-huggingface-cli login
-wandb login
-```
-
-## Building
-
-```bash
-# First time setup
-./scripts/setup.sh
-
-# Build packages
-./scripts/build.sh
-# or
-colcon build --symlink-install
-
-# Source
-source install/setup.bash
-```
+- **`pixi.lock` is committed** (and marked generated in `.gitattributes`).
+  After changing `pixi.toml`, run `pixi lock` and commit both. The lock can
+  only solve when `libs/` is populated (editable path deps) — run
+  `pixi run --frozen setup` first on a fresh clone.
+- CI (`.github/workflows/ci.yaml`) builds the torch-free `ci` environment with
+  `frozen: true`; an out-of-date lockfile fails the build.
+- CI and `setup` use `--frozen` rather than `--locked`: pixi's lock
+  up-to-date check currently mis-reads lerobot's `[tool.uv.sources]` cu128
+  index pin and reports a false mismatch (the lock itself is correct —
+  `pixi lock` regenerates it byte-identical).
+- Non-pixi consumers: keep `package.xml` rosdep metadata honest — see
+  [docs/NON_PIXI.md](docs/NON_PIXI.md).
 
 ## License
 

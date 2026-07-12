@@ -1,0 +1,43 @@
+# Ruff config for the rosetta workspace (adapted from ~/pai_ws).
+# Lint + format: ruff-format adopted July 2026 (one-time ~95-file sweep,
+# landed with the contract/frames/robots/policies restructure).
+indent-width = 4
+line-length = 120
+target-version = "py312"
+
+[lint]
+# Matches _, __, and _var but not _var_
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+fixable = ["ALL"]
+ignore = [
+  # pai baseline
+  "D203",
+  "D400",
+  "D401",
+  "D415",
+  "PLR0912",
+  "PLR0913",
+  "PLR0915",
+  "RUF012",
+  # rosetta additions
+  "D100",    # undocumented modules/classes/functions: not required (yet)
+  "D101",
+  "D102",
+  "D103",
+  "D104",
+  "D105",
+  "D107",
+  "D212",    # summary position: this codebase puts it on the second line
+  "D213",
+  "PLC0415", # imports inside functions ARE the backend plugin architecture
+  "PLR2004", # magic-value comparisons: dimension checks (quaternion == 4,
+             # stereo == 2) and keycodes read clearer inline than as constants
+]
+select = ["E", "W", "F", "I", "B", "D", "RET", "RUF", "PL", "PIE", "FLY"]
+unfixable = []
+
+[lint.per-file-ignores]
+# Tests: docstrings optional; pytest.raises(match=...) substring-regexes are
+# intentional (RUF043)
+"**/test/**" = ["D", "RUF043"]
+"**/tests/**" = ["D", "RUF043"]

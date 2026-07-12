@@ -2,13 +2,19 @@
 # Parallel ROS2 bag to LeRobot dataset conversion
 # Uses sharding to process multiple bags concurrently
 
-set -e
+# pipefail matters: shard processes run as `python | sed` pipelines, and
+# without it `wait` would report sed's status, silently masking a failed shard.
+set -euo pipefail
+
+# Workspace root derived from this script's location (works in the
+# devcontainer and on host checkouts alike).
+WS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Default values
-RAW_DIR="${1:-/workspaces/rosetta_ws/datasets/bags}"
-CONTRACT="${2:-/workspaces/rosetta_ws/src/action/rosetta/contracts/so_101.yaml}"
+RAW_DIR="${1:-${WS_ROOT}/datasets/bags}"
+CONTRACT="${2:-${WS_ROOT}/src/action/rosetta/contracts/so_101.yaml}"
 REPO_ID="${3:-so_101_dataset}"
-ROOT="${4:-/workspaces/rosetta_ws/datasets/lerobot}"
+ROOT="${4:-${WS_ROOT}/datasets/lerobot}"
 NUM_SHARDS="${5:-4}"
 
 echo "========================================"
@@ -31,7 +37,7 @@ if [ "$NUM_BAGS" -eq 0 ]; then
 fi
 
 # Ensure PYTHONPATH includes rosetta
-export PYTHONPATH="/workspaces/rosetta_ws/src/action/rosetta:${PYTHONPATH}"
+export PYTHONPATH="${WS_ROOT}/src/action/rosetta:${PYTHONPATH:-}"
 
 # Use LEROBOT_VIDEO_CODEC if set, otherwise default to libx264 for speed
 export LEROBOT_VIDEO_CODEC="${LEROBOT_VIDEO_CODEC:-libx264}"
@@ -51,7 +57,7 @@ for ((i=0; i<NUM_SHARDS; i++)); do
     SHARD_REPO_ID="${REPO_ID}_shard_${i}"
     echo "Starting shard $i -> $SHARD_REPO_ID"
 
-    python3 -m rosetta.port_bags \
+    python3 -m rosetta.ros2.port \
         --raw-dir "$RAW_DIR" \
         --contract "$CONTRACT" \
         --repo-id "$SHARD_REPO_ID" \
@@ -66,12 +72,14 @@ done
 echo ""
 echo "Waiting for ${#pids[@]} shard processes..."
 
-# Wait for all shards and check for failures
+# Wait for all shards and check for failures.
+# NOTE: not ((failed++)) — under `set -e` its post-increment-from-0 exit
+# status of 1 would abort the script on the first counted failure.
 failed=0
 for pid in "${pids[@]}"; do
     if ! wait "$pid"; then
         echo "Shard process $pid failed"
-        ((failed++))
+        failed=$((failed + 1))
     fi
 done
 
@@ -84,22 +92,24 @@ echo ""
 echo "Phase 2: Aggregating shard datasets..."
 echo ""
 
-# Aggregate datasets using lerobot
-python3 << EOF
+# Aggregate datasets using lerobot. Inputs ride environment variables, not
+# string interpolation into Python source (paths with quotes/spaces survive).
+export WS_ROOT SHARD_ROOT ROOT REPO_ID NUM_SHARDS
+python3 << 'EOF'
+import os
 import sys
 import logging
-sys.path.insert(0, "/workspaces/rosetta_ws/src/action/rosetta")
+sys.path.insert(0, os.environ["WS_ROOT"] + "/src/action/rosetta")
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
 from pathlib import Path
 from lerobot.datasets.aggregate import aggregate_datasets
-from lerobot.datasets.lerobot_dataset import LeRobotDatasetMetadata
 
-shard_root = Path("$SHARD_ROOT")
-output_root = Path("$ROOT")
-repo_id = "$REPO_ID"
-num_shards = $NUM_SHARDS
+shard_root = Path(os.environ["SHARD_ROOT"])
+output_root = Path(os.environ["ROOT"])
+repo_id = os.environ["REPO_ID"]
+num_shards = int(os.environ["NUM_SHARDS"])
 
 # List shard repo IDs
 shard_repo_ids = [f"{repo_id}_shard_{i}" for i in range(num_shards)]

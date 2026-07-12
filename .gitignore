@@ -2,6 +2,9 @@
 build
 install
 log
+# stale/branch overlay dirs (vla-starvla-backends builds into these)
+build_vla
+install_vla
 models
 src
 datasets
@@ -18,6 +21,4 @@ __pycache__/
 # pixi (lockfile committed for reproducible envs)
 .pixi
 # per-environment colcon overlays
-build_vla
-install_vla
 log_vla
