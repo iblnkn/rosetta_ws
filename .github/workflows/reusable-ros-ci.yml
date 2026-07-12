@@ -51,6 +51,30 @@ jobs:
           vcs-repo-file-url: ${{ inputs.upstream-repo-file }}
           import-token: ${{ github.token }}
 
+      # colcon-lint's dependency-check verb looks packages up via ament_index
+      # (FindPackageShare), which is only populated after a real `colcon build`
+      # + `source install/setup.bash` — it can't run against a bare checkout, so
+      # it has to live here (after the build), not in the standalone lint job.
+      # It also unconditionally imports launch.actions regardless of whether the
+      # package itself uses launch; PyPI has an unrelated abandoned package also
+      # named `launch` that does NOT satisfy this — only a real ROS install does,
+      # which this job already has via action-ros-ci.
+      - name: colcon lint (package.xml / manifest correctness)
+        run: |
+          # --system-site-packages: sees the ROS install's launch/ament_index_python.
+          # --ignore-installed: forces a fresh `colcon` entry point *inside* the venv
+          # (otherwise pip treats colcon-core as already satisfied by the system copy
+          # and skips it, so the venv never gets its own colcon script — `which colcon`
+          # keeps resolving to /usr/bin/colcon, which can't see colcon-lint at all).
+          # This avoids --break-system-packages entirely; nothing touches the system
+          # Python install.
+          python3 -m venv --system-site-packages /tmp/lint-venv
+          source /tmp/lint-venv/bin/activate
+          pip install --quiet --ignore-installed colcon-lint
+          source ${{ steps.action-ros-ci.outputs.ros-workspace-directory-name }}/install/setup.bash
+          cd ${{ steps.action-ros-ci.outputs.ros-workspace-directory-name }}
+          colcon lint --packages-select ${{ inputs.package-name }}
+
       - name: Upload colcon logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -62,9 +86,6 @@ jobs:
   # lint failure shows up on this repo's own PRs, not just in rosetta_ws's
   # integration job. ruff.toml is the workspace's shared config; there's one
   # copy (in rosetta_ws) rather than duplicating it into every package repo.
-  # colcon lint checks package.xml/manifest correctness (missing/incorrect
-  # deps, naming) independent of language — catches under-declared deps that
-  # a standalone per-repo build could otherwise mask.
   lint:
     runs-on: ${{ inputs.runs-on }}
     permissions:
@@ -78,8 +99,3 @@ jobs:
       - uses: astral-sh/ruff-action@v3
         with:
           args: check .
-
-      - name: colcon lint (package.xml / manifest correctness)
-        run: |
-          pip install colcon-lint
-          colcon lint
