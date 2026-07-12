@@ -54,3 +54,19 @@ jobs:
         with:
           name: colcon-logs-${{ inputs.package-name }}
           path: ${{ steps.action-ros-ci.outputs.ros-workspace-directory-name }}/log
+
+  # Static analysis is the pyramid's foundation layer — runs standalone so a
+  # lint failure shows up on this repo's own PRs, not just in rosetta_ws's
+  # integration job. ruff.toml is the workspace's shared config; there's one
+  # copy (in rosetta_ws) rather than duplicating it into every package repo.
+  lint:
+    runs-on: ${{ inputs.runs-on }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch shared ruff config
+        run: curl -sL https://raw.githubusercontent.com/iblnkn/rosetta_ws/main/ruff.toml -o ruff.toml
+
+      - uses: astral-sh/ruff-action@v3
+        with:
+          args: check .
