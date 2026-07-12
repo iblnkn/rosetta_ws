@@ -47,6 +47,7 @@ jobs:
           target-ros2-distro: ${{ inputs.ros-distro }}
           package-name: ${{ inputs.package-name }}
           vcs-repo-file-url: ${{ inputs.upstream-repo-file }}
+          import-token: ${{ github.token }}
 
       - name: Upload colcon logs
         if: always()

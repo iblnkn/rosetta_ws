@@ -14,6 +14,11 @@ on:
   pull_request:
   push:
     branches: [main]
+  # Now that build/test is split per package repo, a merge to e.g. rosetta
+  # alone no longer re-triggers this integration build. Nightly catches
+  # cross-package drift between pin bumps.
+  schedule:
+    - cron: "0 7 * * *"
 
 # Cancel in-progress runs for the same PR/branch
 concurrency:
