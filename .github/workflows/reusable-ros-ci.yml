@@ -42,6 +42,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # action-ros-ci does not bootstrap ROS itself on a bare runner — its own
+      # README requires either a preconfigured `setup-ros-docker` container or
+      # this action first. Without it, rosdep/vcs/colcon aren't on PATH at all.
+      - uses: ros-tooling/setup-ros@v0.7
+        with:
+          required-ros-distributions: ${{ inputs.ros-distro }}
+
       - name: Build and test
         id: action-ros-ci
         uses: ros-tooling/action-ros-ci@v0.4
@@ -94,7 +101,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Fetch shared ruff config
-        run: curl -sL https://raw.githubusercontent.com/iblnkn/rosetta_ws/main/ruff.toml -o ruff.toml
+        run: curl -sfL https://raw.githubusercontent.com/iblnkn/rosetta_ws/dev/ruff.toml -o ruff.toml
 
       - uses: astral-sh/ruff-action@v3
         with:
