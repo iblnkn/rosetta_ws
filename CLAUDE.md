@@ -19,7 +19,7 @@ Algorithmic logic must be decoupled from the ROS2 middleware:
 - **Unit Tests (majority)**: pytest, Arrange-Act-Assert. Target ROS-independent logic only — no `rclpy` import, and no `*_msgs` types in the function signature (see above). Fast, deterministic, aim for high coverage on core algorithms. Use `@pytest.mark.parametrize` to cover an algorithm's edge cases instead of duplicating near-identical test functions.
 - **ROS Unit/Component Tests**: Validate node interfaces (topics, services, parameters) in isolation. `rclpy.init()`/`shutdown()` happen once per test class/session (expensive, global); the node itself is created/destroyed per test (cheap, isolated) — see patterns below.
 - **Integration Tests**: Multi-node interaction via `launch_testing` (same framework as C++, used with Python launch files).
-- **End-to-End**: Full system behavior against simulation or real hardware.
+- **End-to-End**: Full system behavior against simulation or real hardware — see patterns below. No test at this level exists in the codebase yet.
 
 ### ROS Unit/Component Test Patterns
 
@@ -30,6 +30,15 @@ Algorithmic logic must be decoupled from the ROS2 middleware:
   - Loop `executor.spin_once(timeout_sec=...)` until the expected condition is observed or a timeout elapses.
   - Use `executor.spin_until_future_complete(future, timeout_sec=...)` for service/action calls.
   - For timer-driven logic, set `use_sim_time` and publish `/clock` from the test node to advance time deterministically instead of waiting in real time.
+
+### End-to-End Test Patterns
+
+An E2E test runs the full stack against a replayed mission and asserts on final state — the level above `launch_testing` integration tests, which only check that a subset of nodes communicate correctly. This project already has rosbag/MCAP infrastructure (see the Rerun MCAP ingestion notes) but no test at this level yet; when one is written:
+
+- **Purpose-built fixture bags**: `ros2 bag record -o <name> <specific topics>`, not `-a` — record exactly what the test needs, not everything.
+- **Deterministic mission replay**: `ros2 bag play --clock <bag>` publishes `/clock`, so any node with `use_sim_time=True` replays on the bag's original timeline instead of wall-clock — the same mechanism as the single-timer case in the Node Pipeline pattern above, scaled to a full mission.
+- **The pattern is `launch_testing`, just bigger**: `generate_test_description()` launches the full system (policy runner + robot interface) plus `ros2 bag play <episode>` as an `ExecuteProcess`; the `unittest.TestCase` creates a temporary node, subscribes to a result/status topic, waits for the bag to finish, and asserts final state within tolerance. No new framework — the same tools as the integration-test layer.
+- **`replay_testing` (Polymath Robotics)**: a purpose-built wrapper for exactly this pattern (launch system + bag together, sync `/clock`, check a completion condition). Worth evaluating before hand-rolling this scaffolding, given how bag-centric this project already is.
 
 ### Determinism and Reliability
 
