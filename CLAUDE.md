@@ -34,12 +34,15 @@ Algorithmic logic must be decoupled from the ROS2 middleware:
 ### Determinism and Reliability
 
 - **No arbitrary sleeps** — they make tests flaky and non-deterministic. Wait on the actual condition (a received message, a service response, a state transition) with a bounded timeout instead.
+- **Subscriber-readiness race in launch_testing integration tests**: `ReadyToTest()` only means the launch *process* completed — it does not mean a node's subscriptions are live yet. Publishing immediately after launch is a classic flaky-test cause: the message gets dropped because nothing is subscribed. Two valid fixes, both already used or documented in this workspace: (1) after creating the test's publisher, loop `spin_once()` while polling `publisher.get_subscription_count() > 0` with a bounded timeout, *then* publish; or (2) use a continuously-repeating publisher (`ros2 topic pub -r <hz> ...`) instead of a one-shot publish, so a late subscriber still catches a message within the poll window — see `rosetta/test/test_bridge_launch.py` for a working example of (2).
 - **Test isolation**: there is no Python/`ament_python` equivalent of `ament_add_ros_isolated_gtest`. Give each test module/session a unique `ROS_DOMAIN_ID` (e.g. via a pytest fixture setting the env var before `rclpy.init()`) to prevent cross-talk when tests run in parallel on the same network. Until that's in place everywhere, `colcon test --executor sequential` is a pragmatic fallback — no code changes, guarantees no cross-talk, costs wall-clock time.
 - **No EXPECT/ASSERT split in pytest**: gtest distinguishes `EXPECT_*` (record failure, keep running — collects multiple mismatches) from `ASSERT_*` (abort immediately — for preconditions where continuing would be meaningless). Plain `assert` in pytest always behaves like `ASSERT_*`; there's no built-in soft-assertion mode. Don't reach for a library to emulate `EXPECT_*` — keep each test narrow enough that one `assert` failure is exactly as informative as the assertion pyramid intends. A test with five stacked asserts loses information when the first one aborts it; five narrow tests don't.
 
 ### Local Development
 
 Pre-commit hooks (ruff, trailing-whitespace, etc. — see `.pre-commit-config.yaml`) catch style issues before they reach CI.
+
+`launch_testing`/`launch_ros` pytest-plugin gotcha: `lerobot_robot_rosetta`'s `setup.cfg` disables both (`-p no:launch_ros -p no:launch_testing`) while `rosetta`'s doesn't, and `rosetta` has a working `launch_testing` test. This lines up with a known pytest≥9.1/`launch_testing` incompatibility (the workspace pins pytest `<9.1` for this reason). Before adding integration tests to any package that disables these plugins, that `addopts` line needs to be revisited first — otherwise `generate_test_description` just won't be collected, silently.
 
 ### Continuous Integration
 
