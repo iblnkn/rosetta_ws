@@ -1,0 +1,56 @@
+name: Reusable ROS CI
+
+# Shared build+test recipe for the rosetta_ws package repos (rosetta,
+# rosetta_interfaces, lerobot_robot_rosetta, lerobot_teleoperator_rosetta,
+# starvla_rosetta, vla_foundry_rosetta). Each repo's own .github/workflows/ci.yml
+# calls this with its package name and a repo-local upstream.repos file listing
+# only its direct dependencies, so a PR to one package doesn't require a green
+# build across the others. rosetta_ws's own ci.yaml is the separate integration
+# job that builds the whole pinned stack together.
+#
+# Public workflow: callable from private caller repos (starvla_rosetta,
+# vla_foundry_rosetta) with no extra auth, since a public reusable workflow is
+# usable by anyone and their upstream deps (rosetta, rosetta_interfaces) are
+# public too.
+
+on:
+  workflow_call:
+    inputs:
+      package-name:
+        description: Space-separated ament package name(s) to build+test
+        required: true
+        type: string
+      upstream-repo-file:
+        description: Repo-relative path to a vcstool .repos file listing direct upstream deps (empty for leaf packages)
+        required: false
+        type: string
+        default: ""
+      ros-distro:
+        required: false
+        type: string
+        default: jazzy
+      runs-on:
+        required: false
+        type: string
+        default: ubuntu-24.04
+
+jobs:
+  build-test:
+    runs-on: ${{ inputs.runs-on }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and test
+        id: action-ros-ci
+        uses: ros-tooling/action-ros-ci@v0.4
+        with:
+          target-ros2-distro: ${{ inputs.ros-distro }}
+          package-name: ${{ inputs.package-name }}
+          vcs-repo-file-url: ${{ inputs.upstream-repo-file }}
+
+      - name: Upload colcon logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: colcon-logs-${{ inputs.package-name }}
+          path: ${{ steps.action-ros-ci.outputs.ros-workspace-directory-name }}/log

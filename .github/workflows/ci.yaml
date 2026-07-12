@@ -1,4 +1,14 @@
-name: CI
+name: Integration
+
+# Cross-package integration build: imports every package repo at the refs
+# pinned in repos/*.repos and builds/tests/lints them together in the pixi
+# envs. This catches breakage that no single package's own CI can see (e.g.
+# a rosetta change landing before a downstream pin is bumped) and validates
+# the pixi lock/workspace convenience layer itself. It is deliberately NOT
+# the primary test gate for any individual package — each package repo
+# (rosetta, rosetta_interfaces, lerobot_robot_rosetta,
+# lerobot_teleoperator_rosetta, starvla_rosetta, vla_foundry_rosetta) has its
+# own standalone CI in its own repo for that.
 
 on:
   pull_request:
