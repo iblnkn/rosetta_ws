@@ -62,6 +62,9 @@ jobs:
   # lint failure shows up on this repo's own PRs, not just in rosetta_ws's
   # integration job. ruff.toml is the workspace's shared config; there's one
   # copy (in rosetta_ws) rather than duplicating it into every package repo.
+  # colcon lint checks package.xml/manifest correctness (missing/incorrect
+  # deps, naming) independent of language — catches under-declared deps that
+  # a standalone per-repo build could otherwise mask.
   lint:
     runs-on: ${{ inputs.runs-on }}
     permissions:
@@ -75,3 +78,8 @@ jobs:
       - uses: astral-sh/ruff-action@v3
         with:
           args: check .
+
+      - name: colcon lint (package.xml / manifest correctness)
+        run: |
+          pip install colcon-lint
+          colcon lint
