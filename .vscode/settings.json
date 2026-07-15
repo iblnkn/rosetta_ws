@@ -21,6 +21,8 @@
         "${workspaceFolder}/install/lib/python3.12/site-packages",
         "${workspaceFolder}/src/action/rosetta"
     ],
+    "git.repositoryScanMaxDepth": 4,
+    "git-graph.maxDepthOfRepoSearch": 4,
     "ros.distro": "jazzy",
     "ROS2.usePixiOnAllPlatforms": true,
     "ROS2.pixiRoot": "${workspaceFolder}",
