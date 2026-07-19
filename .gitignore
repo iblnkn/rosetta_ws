@@ -2,7 +2,7 @@
 build
 install
 log
-# stale/branch overlay dirs (vla-starvla-backends builds into these)
+# stale overlay build dirs from experimental branches
 build_vla
 install_vla
 models
@@ -22,3 +22,9 @@ __pycache__/
 .pixi
 # per-environment colcon overlays
 log_vla
+
+# machine-local agent notes
+CLAUDE.local.md
+
+# Understand Anything analysis artifacts (machine-local, regenerable via /understand)
+.understand-anything/

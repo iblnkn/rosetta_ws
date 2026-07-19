@@ -1,64 +1,66 @@
 This file provides guidance to AI agents when working with code in this repository.
 
+## Workspace Layout
+
+`rosetta_ws` is the pixi-based workspace for **Rosetta**, a ROS 2 ↔ LeRobot bridge. Setup and quick-start live in [README.md](README.md); don't duplicate them here.
+
+- **`src/` and `libs/` are gitignored.** `pixi run setup` populates them via `vcs import` from `repos/src.repos` / `repos/libs.repos`. Each package under `src/` is its own git repository — branch, commit, and diff inside the package repo, not in `rosetta_ws`. `pixi run export-repos` pins the current checkouts back into `repos/*.repos`.
+- `libs/lerobot` is stock upstream lerobot pinned at `v0.6.0` — see `repos/libs.repos` for the one local feature branch and why.
+- Every colcon invocation shares `.colcon/defaults.yaml` (pixi activation exports `COLCON_DEFAULTS_FILE`). `BUILD_TESTING` is **off** in those defaults: run `pixi run build-with-tests` before `pixi run test`, or there are no tests to run. A CLI `--cmake-args` replaces the defaults list wholesale — restate the `Python_FIND_VIRTUALENV` flags if you override (see the `build-with-tests` task for the full list).
+
+Key tasks (`pixi run <task>`): `build`, `build-with-tests`, `test` (colcon test + `test-result --verbose`), `lint` (ruff over `src/action` and `scripts` with the workspace `ruff.toml`, then pre-commit), `clean`, `start-zenoh` (Zenoh RMW router — own terminal, leave running).
+
 ## Testing Standards
 
 Adapted from the [ROS2 Testing Workshop's AI Testing Guide](https://github.com/Ekumen-OS/ros2_testing_workshop_roscon_es_25/blob/main/AI_TESTING_GUIDE.md) for this workspace's stack: Python / `ament_python` / pytest, not C++ / `ament_cmake` / gtest.
 
 ### Testable Design
 
-Algorithmic logic must be decoupled from the ROS2 middleware:
-
-- **Single Responsibility**: ROS2 nodes are thin wrappers over ROS interfaces. Application logic lives in its own class/module, importable and testable without `rclpy`.
-- **Dependency Injection**: Inject dependencies/config into a logic class's constructor rather than constructing them internally, so tests can substitute fakes/mocks.
-- **Interface Segregation**: Depend on abstractions, not concrete implementations, so real components can be swapped for fakes in unit tests.
-- **ROS-agnostic signatures, not just ROS-agnostic imports**: core algorithm functions/classes should take and return plain `numpy` arrays or dataclasses, never a `*_msgs` type directly (e.g. a detector takes `ranges: np.ndarray`, not a `sensor_msgs.msg.LaserScan`). The node class is where message ↔ plain-type conversion happens. Avoiding `rclpy` imports alone isn't enough — a function that still takes a ROS message as its argument is coupled to the message API even if it never touches `rclpy`.
+Algorithmic logic is decoupled from the ROS 2 middleware. Nodes are thin wrappers over ROS interfaces; application logic lives in its own class/module, importable and testable without `rclpy`. Inject dependencies and config through constructors so tests can substitute fakes. Core functions take and return plain `numpy` arrays or dataclasses — never a `*_msgs` type (e.g. a detector takes `ranges: np.ndarray`, not a `sensor_msgs.msg.LaserScan`); message ↔ plain-type conversion happens in the node class. Avoiding `rclpy` imports alone isn't enough — a function that takes a ROS message as an argument is coupled to the message API even if it never touches `rclpy`.
 
 ### Testing Pyramid
 
-- **Static Analysis (foundation)**: `ruff check` / `ruff format` — via `pixi run lint` or each package's own CI lint job. Catches style and correctness issues before runtime.
-- **Unit Tests (majority)**: pytest, Arrange-Act-Assert. Target ROS-independent logic only — no `rclpy` import, and no `*_msgs` types in the function signature (see above). Fast, deterministic, aim for high coverage on core algorithms. Use `@pytest.mark.parametrize` to cover an algorithm's edge cases instead of duplicating near-identical test functions.
-- **ROS Unit/Component Tests**: Validate node interfaces (topics, services, parameters) in isolation. `rclpy.init()`/`shutdown()` happen once per test class/session (expensive, global); the node itself is created/destroyed per test (cheap, isolated) — see patterns below.
-- **Integration Tests**: Multi-node interaction via `launch_testing` (same framework as C++, used with Python launch files).
-- **End-to-End**: Full system behavior against simulation or real hardware — see patterns below. No test at this level exists in the codebase yet.
+- **Static analysis**: `ruff check` / `ruff format` via `pixi run lint` or each package's CI lint job.
+- **Unit tests (the majority)**: pytest over ROS-independent logic only — no `rclpy` import, no `*_msgs` types in signatures. Use `@pytest.mark.parametrize` to cover an algorithm's edge cases instead of duplicating near-identical tests.
+- **ROS component tests**: node interfaces (topics, services, parameters) in isolation — patterns below.
+- **Integration tests**: multi-node interaction via `launch_testing` (Python launch files).
+- **End-to-end**: full system against a replayed mission — none exists yet; patterns below for when one is written.
 
-### ROS Unit/Component Test Patterns
+### ROS Component Test Patterns
 
-- **Fixture lifecycle**: a session/module-scoped fixture calls `rclpy.init()`/`rclpy.shutdown()` once; a function-scoped fixture creates/destroys the node under test per test case. Don't init/shutdown `rclpy` per test — it's the expensive global step the fixture split exists to avoid repeating.
-- **Parameter testing**: construct the node with `parameter_overrides=[...]` and assert `node.get_parameter("name").value` — verifies declaration and propagation without spinning anything.
-- **Topic/service registration checks**: `node.get_topic_names_and_types()` / `node.get_service_names_and_types()` confirm a node exposes the interfaces it's supposed to (name + type), with no message traffic and no executor needed.
-- **Node pipeline tests** (the layer between a pure unit test and a full `launch_testing` integration test — one process, multiple ROS nodes talking to each other): a test node (publishes inputs, subscribes to outputs) plus the DUT node, both added to one `rclpy.executors.SingleThreadedExecutor`. Drive it explicitly, never sleep-and-hope:
-  - Loop `executor.spin_once(timeout_sec=...)` until the expected condition is observed or a timeout elapses.
-  - Use `executor.spin_until_future_complete(future, timeout_sec=...)` for service/action calls.
-  - For timer-driven logic, set `use_sim_time` and publish `/clock` from the test node to advance time deterministically instead of waiting in real time.
+- **Fixture lifecycle**: a session/module-scoped fixture calls `rclpy.init()`/`rclpy.shutdown()` once (expensive, global); a function-scoped fixture creates/destroys the node under test per test (cheap, isolated). Never init/shutdown `rclpy` per test.
+- **Parameters**: construct the node with `parameter_overrides=[...]` and assert `node.get_parameter("name").value` — verifies declaration and propagation without spinning.
+- **Interface registration**: `node.get_topic_names_and_types()` / `node.get_service_names_and_types()` confirm a node exposes the right names and types, with no traffic and no executor.
+- **Node pipelines** (one process, multiple nodes — the layer between a unit test and full `launch_testing`): a test node (publishes inputs, subscribes to outputs) plus the DUT on one `SingleThreadedExecutor`. Drive it explicitly: loop `executor.spin_once(timeout_sec=...)` until the expected condition or a timeout; `spin_until_future_complete(future, timeout_sec=...)` for service/action calls; for timer-driven logic set `use_sim_time` and publish `/clock` from the test node to advance time deterministically.
 
 ### End-to-End Test Patterns
 
-An E2E test runs the full stack against a replayed mission and asserts on final state — the level above `launch_testing` integration tests, which only check that a subset of nodes communicate correctly. This project already has rosbag/MCAP infrastructure (see the Rerun MCAP ingestion notes) but no test at this level yet; when one is written:
+An E2E test runs the full stack against a replayed mission and asserts on final state. When one is written:
 
-- **Purpose-built fixture bags**: `ros2 bag record -o <name> <specific topics>`, not `-a` — record exactly what the test needs, not everything.
-- **Deterministic mission replay**: `ros2 bag play --clock <bag>` publishes `/clock`, so any node with `use_sim_time=True` replays on the bag's original timeline instead of wall-clock — the same mechanism as the single-timer case in the Node Pipeline pattern above, scaled to a full mission.
-- **The pattern is `launch_testing`, just bigger**: `generate_test_description()` launches the full system (policy runner + robot interface) plus `ros2 bag play <episode>` as an `ExecuteProcess`; the `unittest.TestCase` creates a temporary node, subscribes to a result/status topic, waits for the bag to finish, and asserts final state within tolerance. No new framework — the same tools as the integration-test layer.
-- **`replay_testing` (Polymath Robotics)**: a purpose-built wrapper for exactly this pattern (launch system + bag together, sync `/clock`, check a completion condition). Worth evaluating before hand-rolling this scaffolding, given how bag-centric this project already is.
+- **Purpose-built fixture bags**: `ros2 bag record -o <name> <specific topics>`, not `-a`.
+- **Deterministic replay**: `ros2 bag play --clock <bag>` publishes `/clock`, so nodes with `use_sim_time=True` replay on the bag's timeline — the same mechanism as the timer case above, scaled to a full mission.
+- **Same framework, bigger**: `generate_test_description()` launches the full system plus `ros2 bag play <episode>` as an `ExecuteProcess`; the test case subscribes to a result/status topic, waits for the bag to finish, asserts final state within tolerance.
+- Evaluate [`replay_testing`](https://github.com/polymathrobotics/replay_testing) (Polymath Robotics) — a purpose-built wrapper for exactly this pattern — before hand-rolling the scaffolding.
 
 ### Determinism and Reliability
 
-- **No arbitrary sleeps** — they make tests flaky and non-deterministic. Wait on the actual condition (a received message, a service response, a state transition) with a bounded timeout instead.
-- **Subscriber-readiness race in launch_testing integration tests**: `ReadyToTest()` only means the launch *process* completed — it does not mean a node's subscriptions are live yet. Publishing immediately after launch is a classic flaky-test cause: the message gets dropped because nothing is subscribed. Two valid fixes, both already used or documented in this workspace: (1) after creating the test's publisher, loop `spin_once()` while polling `publisher.get_subscription_count() > 0` with a bounded timeout, *then* publish; or (2) use a continuously-repeating publisher (`ros2 topic pub -r <hz> ...`) instead of a one-shot publish, so a late subscriber still catches a message within the poll window — see `rosetta/test/test_bridge_launch.py` for a working example of (2).
-- **Test isolation**: there is no Python/`ament_python` equivalent of `ament_add_ros_isolated_gtest`. Give each test module/session a unique `ROS_DOMAIN_ID` (e.g. via a pytest fixture setting the env var before `rclpy.init()`) to prevent cross-talk when tests run in parallel on the same network. Until that's in place everywhere, `colcon test --executor sequential` is a pragmatic fallback — no code changes, guarantees no cross-talk, costs wall-clock time.
-- **No EXPECT/ASSERT split in pytest**: gtest distinguishes `EXPECT_*` (record failure, keep running — collects multiple mismatches) from `ASSERT_*` (abort immediately — for preconditions where continuing would be meaningless). Plain `assert` in pytest always behaves like `ASSERT_*`; there's no built-in soft-assertion mode. Don't reach for a library to emulate `EXPECT_*` — keep each test narrow enough that one `assert` failure is exactly as informative as the assertion pyramid intends. A test with five stacked asserts loses information when the first one aborts it; five narrow tests don't.
+- **No arbitrary sleeps.** Wait on the actual condition (a received message, a service response, a state transition) with a bounded timeout.
+- **Subscriber-readiness race in `launch_testing` tests**: `ReadyToTest()` means the launch *process* completed, not that subscriptions are live — publishing immediately after launch drops the message. Either poll `publisher.get_subscription_count() > 0` (with `spin_once` and a bounded timeout) before publishing, or use a continuously repeating publisher (`ros2 topic pub -r <hz> ...`) so a late subscriber still catches a message — see `rosetta/test/test_bridge_launch.py` for the latter.
+- **Test isolation**: there is no `ament_python` equivalent of `ament_add_ros_isolated_gtest`. Give each test module a unique `ROS_DOMAIN_ID` (pytest fixture setting the env var before `rclpy.init()`) to prevent cross-talk in parallel runs. Until that's in place everywhere, `colcon test --executor sequential` is the pragmatic fallback.
+- **No EXPECT/ASSERT split in pytest**: plain `assert` always aborts the test (gtest's `ASSERT_*`). Don't add a soft-assertion library — keep each test narrow enough that one assert failing is exactly as informative as intended; five narrow tests beat one test with five stacked asserts.
 
-### Local Development
+## Local Development
 
-Pre-commit hooks (ruff, trailing-whitespace, etc. — see `.pre-commit-config.yaml`) catch style issues before they reach CI.
+- Pre-commit hooks (ruff, trailing-whitespace, etc. — see `.pre-commit-config.yaml`) catch style issues before CI.
+- **`launch_testing` pytest-plugin gotcha**: `lerobot_robot_rosetta`'s `setup.cfg` disables the `launch_ros`/`launch_testing` pytest plugins (`-p no:launch_ros -p no:launch_testing`); `rosetta`'s doesn't, and has a working `launch_testing` test. This matches a known pytest ≥ 9.1 / `launch_testing` incompatibility (the workspace pins pytest `< 9.1` for it). Before adding integration tests to a package that disables these plugins, revisit that `addopts` line first — otherwise `generate_test_description` silently isn't collected.
+- **macOS build gotcha**: on recent macOS SDKs (observed on macOS 26.5/Tahoe), robostack-jazzy's bundled clang/`ld` fails to link any `ament_cmake` dylib with `Undefined symbols ... ___assert_rtn / ___stack_chk_fail / ___stack_chk_guard` — the bundled linker can't resolve implicit libSystem symbols against the new SDK's `.tbd` format. Fixed in `pixi.toml`'s `[target.osx-arm64.activation]`, which routes linking through the system linker via `scripts/macos-ld-wrapper.sh` (Apple's `ld` also requires the `-lto_library` basename to be exactly `libLTO.dylib`, which conda's clang doesn't pass). No action needed unless that env var is removed.
 
-`launch_testing`/`launch_ros` pytest-plugin gotcha: `lerobot_robot_rosetta`'s `setup.cfg` disables both (`-p no:launch_ros -p no:launch_testing`) while `rosetta`'s doesn't, and `rosetta` has a working `launch_testing` test. This lines up with a known pytest≥9.1/`launch_testing` incompatibility (the workspace pins pytest `<9.1` for this reason). Before adding integration tests to any package that disables these plugins, that `addopts` line needs to be revisited first — otherwise `generate_test_description` just won't be collected, silently.
+## Continuous Integration
 
-### Continuous Integration
+Each package repo (`rosetta`, `rosetta_interfaces`, `lerobot_rosetta`, `lerobot_robot_rosetta`, `lerobot_teleoperator_rosetta`) has its own standalone, self-contained `.github/workflows/ci.yml`:
 
-Each package repo (`rosetta`, `rosetta_interfaces`, `lerobot_robot_rosetta`, `lerobot_teleoperator_rosetta`, `starvla_rosetta`, `vla_foundry_rosetta`) has its own standalone `.github/workflows/ci.yml`, self-contained (no cross-repo reusable-workflow reference):
+- **`industrial_ci`** (`ros-industrial/industrial_ci@master`) builds and tests the package inside an official ROS Docker image, so there's no "is ROS actually installed on this runner" class of bug (a bare runner + `ros-tooling/setup-ros` was tried first and hit exactly that). `rosdep` resolves deps from `package.xml`; `UPSTREAM_WORKSPACE` (e.g. `"github:iblnkn/rosetta_interfaces#main"`) pulls direct upstream deps inline. `colcon test-result --verbose` and the `ament_cmake` lint tests run automatically — no custom scripting.
+- **`ROSDEP_SKIP_KEYS: ament_python`** is required on every `ament_python` package's job. `ament_python` has no rosdep key (pure-Python build support ships with base ROS, not as an apt package), and `industrial_ci` treats any unresolved key as fatal. This is a known ecosystem-wide rosdep asymmetry, not a `package.xml` bug.
+- **`lint`** is a separate job running `ruff check` against the shared `ruff.toml` (fetched from `rosetta_ws`) — `industrial_ci` predates ruff.
 
-- **`industrial_ci`** (`ros-industrial/industrial_ci@master`) builds and tests the package. It's Docker-native — pulls an official ROS image and builds inside it, so there's no "is ROS actually installed on this runner" class of bug to hand-roll around (unlike a bare GitHub runner + `ros-tooling/setup-ros`, which was tried first and hit exactly that: missing `rosdep`, missing `ament_package`, missing `launch`). `rosdep` resolves deps straight from `package.xml`; `UPSTREAM_WORKSPACE` (e.g. `"github:iblnkn/rosetta_interfaces#main"`) pulls in direct upstream deps inline, no separate `.repos` file needed. `colcon test` also runs `ament_lint_cmake`/`ament_xmllint` automatically for `ament_cmake` packages, and `colcon test-result --verbose` runs automatically — no custom scripting for either.
-- **`ROSDEP_SKIP_KEYS: ament_python`** is required on every `ament_python` package's `industrial_ci` job. `ament_python` has no rosdep key of its own — pure-Python build support ships with the base ROS install rather than as a separate apt package — and `industrial_ci` treats any unresolved rosdep key as fatal (unlike `action-ros-ci`, which tolerated it silently). This is not a bug in this repo's `package.xml`; it's a known, ecosystem-wide rosdep-database asymmetry (`ament_cmake` does resolve; `ament_python` doesn't).
-- **`lint`** is a separate job running `ruff check` against the shared `ruff.toml` (fetched from `rosetta_ws`) — `industrial_ci` predates ruff and has no native support for it.
-
-`rosetta_ws`'s own CI (`.github/workflows/ci.yaml`) is a separate, pixi-based cross-package integration build — it validates the whole pinned workspace together (including the non-ROS pixi/lerobot/torch stack), not a single package's `colcon` build, and is not the primary gate for any individual package.
+`rosetta_ws`'s own CI (`.github/workflows/ci.yaml`) is a separate pixi-based cross-package integration build — it validates the whole pinned workspace together (including the non-ROS pixi/lerobot/torch stack), and is not the primary gate for any individual package.

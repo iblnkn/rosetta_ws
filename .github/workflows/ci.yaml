@@ -6,8 +6,8 @@ name: Integration
 # a rosetta change landing before a downstream pin is bumped) and validates
 # the pixi lock/workspace convenience layer itself. It is deliberately NOT
 # the primary test gate for any individual package — each package repo
-# (rosetta, rosetta_interfaces, lerobot_robot_rosetta,
-# lerobot_teleoperator_rosetta, starvla_rosetta, vla_foundry_rosetta) has its
+# (rosetta, rosetta_interfaces, lerobot_rosetta, lerobot_robot_rosetta,
+# lerobot_teleoperator_rosetta) has its
 # own standalone CI in its own repo for that.
 
 on:

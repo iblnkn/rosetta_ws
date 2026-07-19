@@ -97,9 +97,6 @@ pixi run ros2 launch rosetta rosetta_client_launch.py backend:=lerobot ...
 Backends register under the `rosetta.dataset_writers` / `rosetta.policy_runners`
 entry-point groups; `rosetta` core imports no ML framework directly.
 
-> Additional experimental backends (TRI vla_foundry, starVLA) and their pixi
-> environments live on the `vla-starvla-backends` branch until they stabilize.
-
 ## Tasks
 
 Everything routes through pixi tasks (`pixi task list` shows all of them; the

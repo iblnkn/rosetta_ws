@@ -1,4 +1,9 @@
 repositories:
+  action/lerobot_rosetta:
+    type: git
+    url: https://github.com/iblnkn/lerobot-rosetta.git
+    version: main
+
   action/lerobot_teleoperator_rosetta:
     type: git
     url: https://github.com/iblnkn/lerobot-teleoperator-rosetta.git

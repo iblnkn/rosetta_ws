@@ -13,6 +13,12 @@ COLCON_DEFAULTS_FILE = "${PIXI_PROJECT_ROOT}/.colcon/defaults.yaml"
 [target.unix.activation]
 env = { RMW_IMPLEMENTATION = "rmw_zenoh_cpp" }
 
+# robostack-jazzy's bundled clang/ld can't resolve implicit libSystem symbols
+# against recent macOS SDKs (see scripts/macos-ld-wrapper.sh for the full
+# story) — route linking through the system linker instead.
+[target.osx-arm64.activation]
+env = { LDFLAGS = "${LDFLAGS} --ld-path=${PIXI_PROJECT_ROOT}/scripts/macos-ld-wrapper.sh" }
+
 # ============================================================================
 # Tasks (default feature: available in the default and ci environments).
 # `default-environment` routes each task to the right env, so plain
@@ -235,7 +241,31 @@ env = { PYTORCH_CUDA_ALLOC_CONF = "expandable_segments:True" }
 [feature.ci.activation.env]
 CMAKE_INSTALL_MODE = "COPY"
 
+# ============================================================================
+# Docs feature: Sphinx site for rosetta (src/action/rosetta/doc).
+# Same toolchain the ROS buildfarm's rosdoc2 uses (Sphinx + MyST), so a
+# local build catches what a docs.ros.org build would.
+# ============================================================================
+[feature.docs.pypi-dependencies]
+sphinx = ">=7"
+myst-parser = ">=2"
+sphinx_rtd_theme = ">=2"
+sphinx-copybutton = ">=0.5"
+sphinx-autobuild = "*"
+
+[feature.docs.tasks.docs-build]
+cmd = "sphinx-build -W -b html src/action/rosetta/doc build/docs"
+description = "Build the docs site to build/docs (warnings are errors)"
+
+[feature.docs.tasks.docs-serve]
+cmd = "sphinx-autobuild --open-browser src/action/rosetta/doc build/docs"
+description = "Serve the docs on localhost with rebuild-on-save"
+
+[feature.docs.tasks.docs-linkcheck]
+cmd = "sphinx-build -b linkcheck src/action/rosetta/doc build/docs-linkcheck"
+description = "Check external links in the docs"
+
 [environments]
-default = { features = ["lerobot"] }
+default = { features = ["lerobot", "docs"] }
 bootstrap = { features = ["bootstrap"], no-default-feature = true }
 ci = { features = ["ci"] }
