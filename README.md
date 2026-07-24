@@ -1,7 +1,7 @@
 # rosetta_ws
 
-The [pixi](https://pixi.sh)-powered workspace for **[Rosetta](src/action/rosetta/README.md)**,
-the ROS2 to LeRobot bridge.
+The [pixi](https://pixi.sh)-powered workspace for **[Rosetta](https://github.com/iblnkn/rosetta)**,
+the ROS2 to LeRobot bridge. Full documentation: **https://iblnkn.github.io/rosetta/**
 
 ## Why This Workspace?
 
@@ -76,8 +76,9 @@ RoboStack's `ros2`/`colcon` entry-point scripts lack the
 [pixi#2366](https://github.com/prefix-dev/pixi/issues/2366) for background.
 
 Prefer a container? The devcontainer (below) is a thin wrapper that runs the
-exact same `pixi run setup`. Want the packages without pixi at all? See
-[docs/NON_PIXI.md](docs/NON_PIXI.md).
+exact same `pixi run setup`. Want the packages without pixi at all? Rosetta's
+[installation guide](https://iblnkn.github.io/rosetta/installation.html)
+covers both paths.
 
 ## Environments
 
@@ -177,8 +178,10 @@ bind-mounted workspace:
   up-to-date check currently mis-reads lerobot's `[tool.uv.sources]` cu128
   index pin and reports a false mismatch (the lock itself is correct —
   `pixi lock` regenerates it byte-identical).
-- Non-pixi consumers: keep `package.xml` rosdep metadata honest — see
-  [docs/NON_PIXI.md](docs/NON_PIXI.md).
+- Non-pixi consumers: keep `package.xml` rosdep metadata honest — the plain-ROS
+  path in Rosetta's
+  [installation guide](https://iblnkn.github.io/rosetta/installation.html)
+  depends on rosdep resolving everything from `package.xml` alone.
 
 ## License
 

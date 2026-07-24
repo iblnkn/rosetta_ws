@@ -16,8 +16,15 @@ env = { RMW_IMPLEMENTATION = "rmw_zenoh_cpp" }
 # robostack-jazzy's bundled clang/ld can't resolve implicit libSystem symbols
 # against recent macOS SDKs (see scripts/macos-ld-wrapper.sh for the full
 # story) — route linking through the system linker instead.
+# KMP_DUPLICATE_LIB_OK: pip-installed torch bundles its own libomp
+# (torch/.dylibs/libomp.dylib) alongside the conda-forge llvm-openmp the ROS
+# stack pulls in. Two OpenMP runtimes in one process makes the Intel runtime
+# abort, so on macOS `import torch` dies with "Fatal Python error: Aborted"
+# and every torch-touching test fails at collection. This is the documented
+# (if unsupported) escape hatch. The real fix is a single libomp in the env;
+# revisit if torch ever ships from conda-forge here. Linux is unaffected.
 [target.osx-arm64.activation]
-env = { LDFLAGS = "${LDFLAGS} --ld-path=${PIXI_PROJECT_ROOT}/scripts/macos-ld-wrapper.sh" }
+env = { LDFLAGS = "${LDFLAGS} --ld-path=${PIXI_PROJECT_ROOT}/scripts/macos-ld-wrapper.sh", KMP_DUPLICATE_LIB_OK = "TRUE" }
 
 # ============================================================================
 # Tasks (default feature: available in the default and ci environments).

@@ -36,6 +36,30 @@ ignore = [
 select = ["E", "W", "F", "I", "B", "D", "RET", "RUF", "PL", "PIE", "FLY"]
 unfixable = []
 
+[lint.isort]
+# Pinned because isort's first-party detection is cwd-dependent: each package's
+# CI runs `ruff check .` from the package root (where `rosetta/` is a local
+# directory -> first-party), while `pixi run lint` runs from the workspace root
+# (where it is not -> third-party). Without this, the two disagree about import
+# order and CI fails on I001 for files that lint clean locally.
+known-first-party = [
+  "rosetta",
+  "rosetta_interfaces",
+  "lerobot_rosetta",
+  "lerobot_robot_rosetta",
+  "lerobot_teleoperator_rosetta",
+  "rerun_rosetta",
+]
+# Pinned for the mirror-image reason: `rosetta/launch/` is a real directory, so
+# from the package root ruff reads the ROS `launch` package as a local module.
+# These are always third-party, wherever ruff is invoked from.
+known-third-party = [
+  "launch",
+  "launch_ros",
+  "launch_testing",
+  "launch_testing_ros",
+]
+
 [lint.per-file-ignores]
 # Tests: docstrings optional; pytest.raises(match=...) substring-regexes are
 # intentional (RUF043)
