@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<!DOCTYPE catalog PUBLIC "-//OASIS//DTD XML Catalogs V1.0//EN"
+  "http://www.oasis-open.org/committees/entity/release/1.0/catalog.dtd">
+<!--
+  Maps the package.xml schema URI to the vendored local copy.
+
+  Every package.xml carries the standard
+  <?xml-model href="http://download.ros.org/schema/package_format3.xsd" ?>
+  declaration, and ament_xmllint validates against it. libxml2 dropped its
+  built-in HTTP client (this workspace ships 2.15.2, compiled without HTTP), so
+  xmllint cannot fetch that URI at all and the test fails with "failed to load
+  ... No such file or directory" — regardless of network. A catalog is
+  libxml2's own redirection mechanism, so the package.xml files stay exactly as
+  the buildfarm expects while resolution happens locally and offline.
+
+  Wired up by XML_CATALOG_FILES in pixi.toml's [activation.env].
+-->
+<catalog xmlns="urn:oasis:names:tc:entity:xmlns:xml:catalog">
+  <uri name="http://download.ros.org/schema/package_format3.xsd"
+       uri="package_format3.xsd"/>
+  <system systemId="http://download.ros.org/schema/package_format3.xsd"
+          uri="package_format3.xsd"/>
+</catalog>

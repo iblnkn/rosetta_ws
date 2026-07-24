@@ -9,6 +9,10 @@ platforms = ["linux-64", "osx-arm64", "linux-aarch64"]
 # any bare `colcon` call inside `pixi shell` behave identically.
 [activation.env]
 COLCON_DEFAULTS_FILE = "${PIXI_PROJECT_ROOT}/.colcon/defaults.yaml"
+# ament_xmllint validates each package.xml against the schema URI declared in
+# the file. libxml2 no longer has an HTTP client, so it can't fetch that URI;
+# this catalog redirects it to the vendored copy. See scripts/xml/catalog.xml.
+XML_CATALOG_FILES = "${PIXI_PROJECT_ROOT}/scripts/xml/catalog.xml"
 
 [target.unix.activation]
 env = { RMW_IMPLEMENTATION = "rmw_zenoh_cpp" }
