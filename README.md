@@ -21,7 +21,7 @@ git clone https://github.com/iblnkn/rosetta_ws.git
 cd rosetta_ws
 pixi run --frozen setup    # clone package/library repos + install the default env
 pixi run build             # colcon build -> install/
-pixi run ros2 launch rosetta rosetta_client_launch.py
+pixi run ros2 launch rosetta episode_recorder_launch.py contract_path:=<your contract>
 ```
 
 (`--frozen` is only needed for that first `setup`: until it clones `libs/`,
@@ -92,11 +92,13 @@ Convert bags to a dataset and deploy a policy:
 
 ```bash
 pixi run convert-bags --raw-dir ... --contract ... --repo-id ...
-pixi run ros2 launch rosetta rosetta_client_launch.py backend:=lerobot ...
+pixi run ros2 launch rosetta policy_runner_launch.py \
+    contract_path:=... pretrained_name_or_path:=...
 ```
 
 Backends register under the `rosetta.dataset_writers` / `rosetta.policy_runners`
-entry-point groups; `rosetta` core imports no ML framework directly.
+entry-point groups (`lerobot_rosetta` provides both, named `lerobot`); `rosetta`
+core imports no ML framework directly.
 
 ## Tasks
 
@@ -114,6 +116,7 @@ VS Code tasks in `.vscode/tasks.json` are one-line wrappers around these):
 | `start-zenoh` | default | Zenoh RMW router (own terminal, leave running) |
 | `convert-bags` / `convert-bags-parallel` | default | bag → LeRobot dataset conversion |
 | `train` / `resume-train` | default | LeRobot policy training (`scripts/train_policy.py`) |
+| `docs-build` / `docs-serve` / `docs-linkcheck` | default | Sphinx site from `src/action/rosetta/doc` (build with warnings-as-errors, live-reload server, external link check) |
 | `export-repos` | default | pin current checkouts back into `repos/*.repos` |
 
 Colcon behavior (merge-install, symlink-install, cmake-args, `base-paths: src`)
@@ -133,8 +136,9 @@ rosetta_ws/
 ├── src/action/              # ROS2 packages (from repos/src.repos)
 │   ├── rosetta/             # Core package - see rosetta/README.md
 │   ├── rosetta_interfaces/  # ROS2 action/service definitions
-│   ├── lerobot_robot_rosetta/        # LeRobot backend leaf
-│   └── lerobot_teleoperator_rosetta/
+│   ├── lerobot_rosetta/     # rosetta -> LeRobot adapter (dataset writer, policy runner, servers)
+│   ├── lerobot_robot_rosetta/        # LeRobot-discovered Robot plugin
+│   └── lerobot_teleoperator_rosetta/ # LeRobot-discovered Teleoperator plugin
 ├── libs/                    # Python libraries (from repos/libs.repos, editable installs)
 │   └── lerobot/             # LeRobot
 ├── models/                  # Trained policies
