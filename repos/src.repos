@@ -7,17 +7,17 @@ repositories:
   action/lerobot_teleoperator_rosetta:
     type: git
     url: https://github.com/iblnkn/lerobot-teleoperator-rosetta.git
-    version: dev
+    version: main
 
   action/lerobot_robot_rosetta:
     type: git
     url: https://github.com/iblnkn/lerobot-robot-rosetta.git
-    version: dev
+    version: main
 
   action/rosetta:
     type: git
     url: https://github.com/iblnkn/rosetta.git
-    version: dev
+    version: main
 
   action/rosetta_interfaces:
     type: git

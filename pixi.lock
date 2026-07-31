@@ -13383,7 +13383,7 @@ packages:
   license: MIT
   license_family: MIT
   purls:
-  - pkg:pypi/ruff?source=compressed-mapping
+  - pkg:pypi/ruff?source=hash-mapping
   run_exports: {}
   size: 9356259
   timestamp: 1783653725254
@@ -24519,7 +24519,7 @@ packages:
   - python >=3.10
   license: Unlicense
   purls:
-  - pkg:pypi/filelock?source=compressed-mapping
+  - pkg:pypi/filelock?source=hash-mapping
   run_exports: {}
   size: 39652
   timestamp: 1783505066242
@@ -25702,7 +25702,7 @@ packages:
   license: MIT
   license_family: MIT
   purls:
-  - pkg:pypi/virtualenv?source=compressed-mapping
+  - pkg:pypi/virtualenv?source=hash-mapping
   run_exports: {}
   size: 3272894
   timestamp: 1783424056921
@@ -72762,8 +72762,8 @@ packages:
   - pandas>=2.0.0,<3.0.0 ; extra == 'dataset'
   - pyarrow>=21.0.0,<30.0.0 ; extra == 'dataset'
   - lerobot[av-dep] ; extra == 'dataset'
-  - torchcodec>=0.3.0,<0.12.0 ; (platform_machine == 'AMD64' and sys_platform == 'linux' and extra == 'dataset') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'dataset') or (platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'dataset')
-  - torchcodec>=0.7.0,<0.12.0 ; sys_platform == 'win32' and extra == 'dataset'
+  - torchcodec>=0.11.0,<0.12.0 ; (platform_machine == 'AMD64' and sys_platform == 'linux' and extra == 'dataset') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'dataset') or (platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'dataset')
+  - torchcodec>=0.11.0,<0.12.0 ; sys_platform == 'win32' and extra == 'dataset'
   - torchcodec>=0.11.0,<0.12.0 ; (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'dataset') or (platform_machine == 'arm64' and sys_platform == 'linux' and extra == 'dataset')
   - jsonlines>=4.0.0,<5.0.0 ; extra == 'dataset'
   - lerobot[dataset] ; extra == 'training'
