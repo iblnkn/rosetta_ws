@@ -1,0 +1,282 @@
+[workspace]
+name = "rosetta_ws"
+description = "ROS 2 Jazzy + LeRobot development workspace"
+channels = ["https://prefix.dev/robostack-jazzy", "https://prefix.dev/conda-forge"]
+platforms = ["linux-64", "osx-arm64", "linux-aarch64"]
+
+# Colcon reads its workspace-wide config (merge-install, symlink-install,
+# cmake-args, base-paths) from .colcon/defaults.yaml, so every task below and
+# any bare `colcon` call inside `pixi shell` behave identically.
+[activation.env]
+COLCON_DEFAULTS_FILE = "${PIXI_PROJECT_ROOT}/.colcon/defaults.yaml"
+# ament_xmllint validates each package.xml against the schema URI declared in
+# the file. libxml2 no longer has an HTTP client, so it can't fetch that URI;
+# this catalog redirects it to the vendored copy. See scripts/xml/catalog.xml.
+XML_CATALOG_FILES = "${PIXI_PROJECT_ROOT}/scripts/xml/catalog.xml"
+
+[target.unix.activation]
+env = { RMW_IMPLEMENTATION = "rmw_zenoh_cpp" }
+
+# robostack-jazzy's bundled clang/ld can't resolve implicit libSystem symbols
+# against recent macOS SDKs (see scripts/macos-ld-wrapper.sh for the full
+# story) — route linking through the system linker instead.
+# KMP_DUPLICATE_LIB_OK: pip-installed torch bundles its own libomp
+# (torch/.dylibs/libomp.dylib) alongside the conda-forge llvm-openmp the ROS
+# stack pulls in. Two OpenMP runtimes in one process makes the Intel runtime
+# abort, so on macOS `import torch` dies with "Fatal Python error: Aborted"
+# and every torch-touching test fails at collection. This is the documented
+# (if unsupported) escape hatch. The real fix is a single libomp in the env;
+# revisit if torch ever ships from conda-forge here. Linux is unaffected.
+[target.osx-arm64.activation]
+env = { LDFLAGS = "${LDFLAGS} --ld-path=${PIXI_PROJECT_ROOT}/scripts/macos-ld-wrapper.sh", KMP_DUPLICATE_LIB_OK = "TRUE" }
+
+# ============================================================================
+# Tasks (default feature: available in the default and ci environments).
+# `default-environment` routes each task to the right env, so plain
+# `pixi run <task>` does the right thing without -e.
+# Extra CLI args are appended: `pixi run build --packages-select rosetta`.
+# ============================================================================
+
+[tasks.build]
+description = "colcon build -> install/ (flags come from .colcon/defaults.yaml)"
+default-environment = "default"
+cmd = "colcon build"
+inputs = ["src", ".colcon"]
+
+[tasks.build-with-tests]
+description = "colcon build with BUILD_TESTING enabled (restates the defaults.yaml cmake-args, which a CLI --cmake-args replaces wholesale)"
+default-environment = "default"
+cmd = "colcon build --cmake-args -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DBUILD_TESTING=ON -DPython_FIND_VIRTUALENV=ONLY -DPython3_FIND_VIRTUALENV=ONLY"
+inputs = ["src", ".colcon"]
+
+[tasks.test]
+description = "colcon test + report (fails the task if any test fails)"
+default-environment = "default"
+cmd = "colcon test && colcon test-result --verbose"
+
+[tasks.clean]
+description = "Remove colcon build/install/log directories"
+default-environment = "default"
+cmd = "rm -rf build install log"
+
+[tasks.lint]
+description = "ruff over package + workspace python; pre-commit hooks over workspace files"
+default-environment = "default"
+# ruff covers src/action (vcs-imported package repos, invisible to this repo's
+# pre-commit) using the workspace ruff.toml; pre-commit covers the files the
+# workspace repo itself tracks (scripts, yaml, shell). Same layering as pai_ws,
+# adapted to the multi-repo src/ layout.
+cmd = "ruff check src/action scripts && ruff format --check src/action && pre-commit run --all-files"
+
+[tasks.export-repos]
+description = "Pin current checkouts back into repos/*.repos"
+default-environment = "default"
+cmd = "vcs export src > repos/src.repos && vcs export libs > repos/libs.repos"
+
+[tasks._register-mixins]
+description = "Register the workspace-local colcon mixin index (debug, release, asan, ...)"
+default-environment = "default"
+# Tasks run from the project root, so $(pwd) anchors the file:// URL.
+# `mixin add` errors if the name already exists; `|| true` makes re-runs
+# idempotent. `update` always follows to pull the current mixin set.
+cmd = "colcon mixin add rosetta file://$(pwd)/.colcon/mixin/index.yaml 2>/dev/null || true && colcon mixin update rosetta"
+
+[tasks.start-zenoh]
+description = "Start the Zenoh RMW router (run in its own terminal, leave running)"
+default-environment = "default"
+cmd = "ros2 run rmw_zenoh_cpp rmw_zenohd"
+
+# ============================================================================
+# Bootstrap feature: a tiny env usable BEFORE libs/ exists. The default env
+# cannot solve on a fresh clone (lerobot is an editable path dep
+# under libs/), so setup imports the repos from this env first, then installs
+# the default env.
+#
+# NOTE: on a fresh clone this must run as `pixi run --frozen setup` — without
+# --frozen, pixi validates the whole lockfile first, which canonicalizes the
+# libs/* editable paths that don't exist yet. --frozen is safe here: the lock
+# is exactly what the clone shipped.
+# ============================================================================
+[feature.bootstrap.dependencies]
+git = "*"
+vcstool = "*"
+
+[feature.bootstrap.tasks._vcs-import-libs]
+description = "Clone python libraries (lerobot) into libs/"
+default-environment = "bootstrap"
+cmd = "mkdir -p libs && vcs import libs --input repos/libs.repos --recursive && touch libs/COLCON_IGNORE"
+
+[feature.bootstrap.tasks._vcs-import-src]
+description = "Clone the ROS package repos into src/"
+default-environment = "bootstrap"
+cmd = "mkdir -p src && vcs import src --input repos/src.repos --recursive"
+
+[feature.bootstrap.tasks.setup]
+description = "Fresh-clone setup: import repos, install the default env, register colcon mixins"
+default-environment = "bootstrap"
+depends-on = ["_vcs-import-libs", "_vcs-import-src"]
+# --frozen: install exactly the lock that shipped with the clone (no re-solve;
+# pixi's up-to-date check also mis-reads lerobot's [tool.uv.sources] pin).
+# -e default explicitly: the nested `pixi run` inherits this task's bootstrap
+# env context and can't resolve the task's environment on its own.
+cmd = "pixi install -e default --frozen && pixi run --frozen -e default _register-mixins && echo 'Setup complete. Next: pixi run build'"
+
+# ============================================================================
+# Shared base (conda): ROS 2 Jazzy + build tooling. Used by every environment
+# except bootstrap (no-default-feature).
+# ============================================================================
+[dependencies]
+python = ">=3.12,<3.13"
+compilers = "*"
+cmake = ">=3.16,<4.0"
+pkg-config = "*"
+make = "*"
+ninja = "*"
+rosdep = "*"
+colcon-common-extensions = "*"
+colcon-mixin = "*"
+vcstool = "*"
+ruff = "*"
+pre-commit = "*"
+packaging = ">=24.2,<26.0"
+# <9.1: launch_testing's pytest plugin still uses the `path` hook argument
+# that pytest 9.1 removed (plugin validation error at collection otherwise).
+pytest = "<9.1"
+
+# ROS 2 Jazzy
+ros-jazzy-desktop = "*"
+ros-jazzy-rmw-zenoh-cpp = ">=0.2.9,<0.3"
+ros-jazzy-cv-bridge = "*"
+ros-jazzy-control-msgs = "*"
+ros-jazzy-image-transport = "*"
+ros-jazzy-pcl-ros = "*"
+ros-jazzy-rosbag2-storage-mcap = "*"
+ros-jazzy-teleop-twist-keyboard = "*"
+ros-jazzy-teleop-twist-joy = "*"
+ros-jazzy-joy = "*"
+ros-jazzy-ament-cmake-vendor-package = ">=2.5.4,<3"
+ros-jazzy-camera-calibration-parsers = "*"
+# Operator tooling (resolves on all three platforms)
+ros-jazzy-foxglove-bridge = "*"
+# ament linters: the lint task + the packages' test_depends
+ros-jazzy-ament-flake8 = "*"
+ros-jazzy-ament-pep257 = "*"
+ros-jazzy-ament-xmllint = "*"
+ros-jazzy-ament-copyright = "*"
+ros-jazzy-ament-lint-auto = "*"
+ros-jazzy-ament-lint-common = "*"
+
+[target.linux.dependencies]
+libgl-devel = "*"
+
+# Shared pypi: ROS 2 python build helpers + glue needed by BOTH environments to
+# build/run the rosetta ament_python packages (framework-agnostic).
+[pypi-dependencies]
+empy = "==3.3.4"
+catkin-pkg = "*"
+lark-parser = "*"
+transforms3d = "*"
+ruamel-yaml = "*"
+grpcio = "*"
+# Websocket/serialization glue used by optional in-tree leaf packages.
+msgpack = "*"
+websockets = "*"
+
+# ============================================================================
+# LeRobot feature: the LeRobot policy backend stack.
+# ============================================================================
+[feature.lerobot.target.unix.activation]
+scripts = ["scripts/activate.sh"]
+
+[feature.lerobot.dependencies]
+# Conda builds of native-lib data/video packages: pip wheels link the system
+# libiconv's `_iconv` symbol, which the conda libiconv (loaded first in-env)
+# lacks -> dlopen crash. Conda builds link the conda libiconv consistently.
+pyarrow = ">=23,<24"
+av = ">=15,<16"
+# lerobot 0.6.0 pins numpy>=2.0,<2.3; the ROS stack otherwise floats to 2.4.
+numpy = ">=2.2,<2.3"
+
+[feature.lerobot.pypi-dependencies]
+# Extras supply what used to be explicit dup entries here: dataset
+# (datasets/av/pyarrow/torchcodec/jsonlines), async (grpcio/matplotlib),
+# training (wandb/accelerate), peft (transformers>=5.4/peft for LoRA).
+lerobot = { path = "libs/lerobot", editable = true, extras = ["dataset", "async", "training", "peft", "smolvla"] }
+torch = "*"
+torchvision = "*"
+torchaudio = "*"
+scipy = "*"
+scikit-learn = "*"
+einops = "*"
+gymnasium = "*"
+imageio = { version = "*", extras = ["ffmpeg"] }
+opencv-python-headless = "*"
+diffusers = ">=0.27"
+# huggingface-hub >= 1.0 ships the CLI in the base package (no 'cli' extra).
+huggingface-hub = "*"
+hf-transfer = "*"
+trimesh = { version = "*", extras = ["easy"] }
+yourdfpy = "*"
+simple-parsing = "*"
+draccus = "*"
+pyserial = "*"
+feetech-servo-sdk = "*"
+
+# ---- LeRobot ML workflow tasks ----
+
+[feature.lerobot.tasks.convert-bags]
+description = "Convert ROS2 bags to a LeRobot dataset (append --raw-dir/--contract/--repo-id/--root)"
+default-environment = "default"
+cmd = "python -m rosetta.robots.ros2.offline.port"
+
+[feature.lerobot.tasks.convert-bags-parallel]
+description = "Sharded parallel bag conversion (args: bags-dir contract repo-id root num-shards)"
+default-environment = "default"
+cmd = "./scripts/convert_bags_parallel.sh"
+
+[feature.lerobot.tasks.train]
+description = "Train a LeRobot policy (see scripts/train_policy.py --help)"
+default-environment = "default"
+cmd = "python scripts/train_policy.py"
+env = { PYTORCH_CUDA_ALLOC_CONF = "expandable_segments:True" }
+
+[feature.lerobot.tasks.resume-train]
+description = "Resume training from a checkpoint (append --config_path=...)"
+default-environment = "default"
+cmd = "lerobot-train --resume=true"
+env = { PYTORCH_CUDA_ALLOC_CONF = "expandable_segments:True" }
+
+# ============================================================================
+# CI feature: torch-free ROS build (COPY instead of symlink install).
+# ============================================================================
+[feature.ci.activation.env]
+CMAKE_INSTALL_MODE = "COPY"
+
+# ============================================================================
+# Docs feature: Sphinx site for rosetta (src/action/rosetta/doc).
+# Same toolchain the ROS buildfarm's rosdoc2 uses (Sphinx + MyST), so a
+# local build catches what a docs.ros.org build would.
+# ============================================================================
+[feature.docs.pypi-dependencies]
+sphinx = ">=7"
+myst-parser = ">=2"
+sphinx_rtd_theme = ">=2"
+sphinx-copybutton = ">=0.5"
+sphinx-autobuild = "*"
+
+[feature.docs.tasks.docs-build]
+cmd = "sphinx-build -W -b html src/action/rosetta/doc build/docs"
+description = "Build the docs site to build/docs (warnings are errors)"
+
+[feature.docs.tasks.docs-serve]
+cmd = "sphinx-autobuild --open-browser src/action/rosetta/doc build/docs"
+description = "Serve the docs on localhost with rebuild-on-save"
+
+[feature.docs.tasks.docs-linkcheck]
+cmd = "sphinx-build -b linkcheck src/action/rosetta/doc build/docs-linkcheck"
+description = "Check external links in the docs"
+
+[environments]
+default = { features = ["lerobot", "docs"] }
+bootstrap = { features = ["bootstrap"], no-default-feature = true }
+ci = { features = ["ci"] }

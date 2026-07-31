@@ -1,0 +1,31 @@
+# Workspace-repo hooks (src/ and libs/ are separate vcs-imported repos and are
+# NOT seen by pre-commit — package python code is linted by `ruff check` in the
+# `pixi run lint` task instead).
+# See https://pre-commit.com for more information
+repos:
+  # ---- General file hygiene ----
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-added-large-files
+        args: [--maxkb=500]
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+
+  # ---- Python (workspace scripts) ----
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.11.4
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  # ---- Shell ----
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
+    hooks:
+      - id: shellcheck

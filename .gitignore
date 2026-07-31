@@ -2,7 +2,29 @@
 build
 install
 log
+# stale overlay build dirs from experimental branches
+build_vla
+install_vla
 models
 src
 datasets
 logs
+
+# vcs-imported libs (see repos/libs.repos); keep the colcon marker
+libs/*
+!libs/COLCON_IGNORE
+
+# python bytecode
+__pycache__/
+*.pyc
+
+# pixi (lockfile committed for reproducible envs)
+.pixi
+# per-environment colcon overlays
+log_vla
+
+# machine-local agent notes
+CLAUDE.local.md
+
+# Understand Anything analysis artifacts (machine-local, regenerable via /understand)
+.understand-anything/

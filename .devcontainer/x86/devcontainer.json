@@ -1,9 +1,11 @@
 {
     "name": "Rosetta x86",
 
+    // Thin wrapper: the image only provides CUDA + pixi + X11 libs.
+    // All provisioning happens via `pixi run setup` in postCreateCommand.
     "build": {
-        "dockerfile": "../../docker/Dockerfile.x86",
-        "context": "../../docker",
+        "dockerfile": "../../docker/Dockerfile",
+        "context": "../..",
         "target": "dev"
     },
 
@@ -13,6 +15,11 @@
 
     // Create auth directories on host if they don't exist
     "initializeCommand": "mkdir -p ~/.cache/huggingface ~/.config/wandb ~/.claude && touch ~/.netrc 2>/dev/null || true",
+
+    // Take ownership of the .pixi volume (which mounts in root-owned), then run
+    // the workspace setup (vcs import + pixi install) so a fresh devcontainer is
+    // immediately ready for `pixi run build`.
+    "postCreateCommand": "if [ \"$(id -u)\" -ne 0 ]; then sudo chown -R $(id -u):$(id -g) /workspaces/rosetta_ws/.pixi /home/ros/.cache; fi && pixi run --frozen setup && pixi run --frozen -e default pre-commit install",
 
     "runArgs": [
         "--network=host",
@@ -43,6 +50,10 @@
         "source=/run/user/1000,target=/run/user/1000,type=bind",
         // Hardware access
         "source=/dev,target=/dev,type=bind",
+        // .pixi as a named volume (avoids case-insensitive-FS corruption on
+        // mac/Windows hosts and bind-mount overhead on Linux). Arch-specific
+        // name because installed conda binaries differ across architectures.
+        "source=rosetta_ws-pixi-x86,target=/workspaces/rosetta_ws/.pixi,type=volume",
         // Auth persistence (bind from host - shared across containers)
         "source=${localEnv:HOME}/.cache/huggingface,target=/home/ros/.cache/huggingface,type=bind,consistency=cached",
         "source=${localEnv:HOME}/.config/wandb,target=/home/ros/.config/wandb,type=bind,consistency=cached",
@@ -54,12 +65,13 @@
     "customizations": {
         "vscode": {
             "settings": {
-                "python.defaultInterpreterPath": "/home/ros/.venv/bin/python",
+                "python.defaultInterpreterPath": "/workspaces/rosetta_ws/.pixi/envs/default/bin/python",
                 "remote.autoForwardPorts": false
             },
             "extensions": [
                 "anthropic.claude-code",
-                "ms-iot.vscode-ros",
+                "renan-r-santos.pixi-code",
+                "ranch-hand-robotics.rde-pack",
                 "ms-python.python",
                 "ms-python.vscode-pylance",
                 "ms-vscode.cpptools",

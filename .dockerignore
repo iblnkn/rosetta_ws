@@ -1,0 +1,4 @@
+# The devcontainer image is toolchain-only (no COPY of workspace files), so
+# exclude the entire context — keeps `docker build` from shipping the multi-GB
+# workspace (datasets, .pixi, build trees) to the daemon.
+*

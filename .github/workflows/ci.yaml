@@ -1,0 +1,104 @@
+name: Integration
+
+# Cross-package integration build: imports every package repo at the refs
+# pinned in repos/*.repos and builds/tests/lints them together in the pixi
+# envs. This catches breakage that no single package's own CI can see (e.g.
+# a rosetta change landing before a downstream pin is bumped) and validates
+# the pixi lock/workspace convenience layer itself. It is deliberately NOT
+# the primary test gate for any individual package — each package repo
+# (rosetta, rosetta_interfaces, lerobot_rosetta, lerobot_robot_rosetta,
+# lerobot_teleoperator_rosetta) has its
+# own standalone CI in its own repo for that.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  # Now that build/test is split per package repo, a merge to e.g. rosetta
+  # alone no longer re-triggers this integration build. Nightly catches
+  # cross-package drift between pin bumps.
+  schedule:
+    - cron: "0 7 * * *"
+
+# Cancel in-progress runs for the same PR/branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # libs/ must exist before pixi installs: lerobot is an editable path
+      # dependency of the default env. Import with pip vcstool (pre-pixi)
+      # so setup-pixi's install step never sees a missing path.
+      - name: Import repos
+        run: |
+          pip install vcstool
+          mkdir -p libs src
+          vcs import libs --input repos/libs.repos --recursive
+          touch libs/COLCON_IGNORE
+          vcs import src --input repos/src.repos --recursive
+
+      - uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          pixi-version: v0.72.2
+          cache: true
+          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+          frozen: true
+          # Only solve/install the torch-free ci env (the ament_python
+          # packages build without the ML stacks).
+          environments: ci
+
+      # --frozen: run against the committed lock exactly (plain `pixi run`
+      # would try to revalidate/re-solve; the up-to-date check currently
+      # mis-reads lerobot's [tool.uv.sources] index pin).
+      - name: Build
+        run: pixi run --frozen -e ci build
+
+      - name: Cache pre-commit hook environments
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+
+      - name: Lint
+        run: pixi run --frozen -e ci lint
+
+      # No test step here: the packages' suites import the ML frameworks,
+      # which the torch-free ci env deliberately excludes. The `test` job
+      # below runs them in the full default env.
+
+  # Full test suite in the default env (ROS + LeRobot + torch). Heavy (~6 GB,
+  # cached by setup-pixi after the first run) but exercises the real stack —
+  # torch cu128 wheels run fine on CPU-only runners.
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Import repos
+        run: |
+          pip install vcstool
+          mkdir -p libs src
+          vcs import libs --input repos/libs.repos --recursive
+          touch libs/COLCON_IGNORE
+          vcs import src --input repos/src.repos --recursive
+
+      - uses: prefix-dev/setup-pixi@v0.9.4
+        with:
+          pixi-version: v0.72.2
+          cache: true
+          cache-write: ${{ github.event_name == 'push' && github.ref_name == 'main' }}
+          frozen: true
+          environments: default
+
+      - name: Build
+        run: pixi run --frozen build
+
+      - name: Test
+        run: pixi run --frozen test
