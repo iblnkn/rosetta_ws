@@ -160,6 +160,8 @@ rosetta_ws/
 ├── src/action/              # ROS2 packages (from repos/src.repos)
 │   ├── rosetta/             # Core package (contracts, recorder, porter, policy runner)
 │   ├── rosetta_interfaces/  # ROS2 action/service definitions
+│   ├── rosetta_hil/         # Human-in-the-loop manager, an app on rosetta's public API
+│   ├── rosetta_hil_interfaces/ # Its action/service definitions
 │   ├── lerobot_rosetta/     # rosetta -> LeRobot adapter (dataset writer, policy runner, servers)
 │   ├── lerobot_robot_rosetta/        # LeRobot-discovered Robot plugin
 │   └── lerobot_teleoperator_rosetta/ # LeRobot-discovered Teleoperator plugin
