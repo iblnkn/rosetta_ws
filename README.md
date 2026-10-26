@@ -27,7 +27,7 @@ git clone https://github.com/iblnkn/rosetta_ws.git
 cd rosetta_ws
 pixi run --frozen setup    # clone package/library repos + install the default env
 pixi run build             # colcon build -> install/
-pixi run ros2 launch rosetta episode_recorder_launch.py contract_path:=<your contract>
+pixi run ros2 launch rosetta_ros episode_recorder_launch.py contract_path:=<your contract>
 ```
 
 (`--frozen` is only needed for that first `setup`: until it clones `libs/`,
@@ -128,7 +128,7 @@ The ML workflow end-to-end, as tasks:
 ```bash
 pixi run convert-bags --raw-dir ... --contract ... --repo-id ...
 pixi run train --help
-pixi run ros2 launch rosetta policy_runner_launch.py \
+pixi run ros2 launch rosetta_ros policy_runner_launch.py \
     contract_path:=... pretrained_name_or_path:=...
 ```
 

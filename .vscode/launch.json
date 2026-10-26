@@ -13,7 +13,7 @@
             "name": "ROS2: Rosetta Client",
             "type": "ros2",
             "request": "launch",
-            "target": "${workspaceFolder}/src/action/rosetta/rosetta/launch/policy_runner_launch.py",
+            "target": "${workspaceFolder}/src/action/rosetta/rosetta_ros/launch/policy_runner_launch.py",
             "env": {
                 "RMW_IMPLEMENTATION": "rmw_zenoh_cpp"
             }
@@ -22,7 +22,7 @@
             "name": "ROS2: Episode Recorder",
             "type": "ros2",
             "request": "launch",
-            "target": "${workspaceFolder}/src/action/rosetta/rosetta/launch/episode_recorder_launch.py",
+            "target": "${workspaceFolder}/src/action/rosetta/rosetta_ros/launch/episode_recorder_launch.py",
             "env": {
                 "RMW_IMPLEMENTATION": "rmw_zenoh_cpp"
             }

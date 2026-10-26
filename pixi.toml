@@ -227,7 +227,7 @@ feetech-servo-sdk = "*"
 [feature.lerobot.tasks.convert-bags]
 description = "Convert ROS2 bags to a LeRobot dataset (append --raw-dir/--contract/--repo-id/--root)"
 default-environment = "default"
-cmd = "python -m rosetta.robots.ros2.offline.port"
+cmd = "python -m rosetta_ros.offline.port"
 
 [feature.lerobot.tasks.convert-bags-parallel]
 description = "Sharded parallel bag conversion (args: bags-dir contract repo-id root num-shards)"

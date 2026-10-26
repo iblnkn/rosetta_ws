@@ -44,6 +44,7 @@ unfixable = []
 # order and CI fails on I001 for files that lint clean locally.
 known-first-party = [
   "rosetta",
+  "rosetta_ros",
   "rosetta_interfaces",
   "rosetta_hil",
   "rosetta_hil_interfaces",
@@ -52,7 +53,7 @@ known-first-party = [
   "lerobot_teleoperator_rosetta",
   "rerun_rosetta",
 ]
-# Pinned for the mirror-image reason: `rosetta/launch/` is a real directory, so
+# Pinned for the mirror-image reason: `rosetta_ros/launch/` is a real directory, so
 # from the package root ruff reads the ROS `launch` package as a local module.
 # These are always third-party, wherever ruff is invoked from.
 known-third-party = [

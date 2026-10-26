@@ -12,7 +12,7 @@ WS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Default values
 RAW_DIR="${1:-${WS_ROOT}/datasets/bags}"
-CONTRACT="${2:-${WS_ROOT}/src/action/rosetta/rosetta/contracts/so_101.yaml}"
+CONTRACT="${2:-${WS_ROOT}/src/action/rosetta/rosetta_ros/contracts/so_101.yaml}"
 REPO_ID="${3:-so_101_dataset}"
 ROOT="${4:-${WS_ROOT}/datasets/lerobot}"
 NUM_SHARDS="${5:-4}"
@@ -36,8 +36,8 @@ if [ "$NUM_BAGS" -eq 0 ]; then
     exit 1
 fi
 
-# Ensure PYTHONPATH includes rosetta
-export PYTHONPATH="${WS_ROOT}/src/action/rosetta/rosetta:${PYTHONPATH:-}"
+# Ensure PYTHONPATH includes rosetta and rosetta_ros
+export PYTHONPATH="${WS_ROOT}/src/action/rosetta/rosetta:${WS_ROOT}/src/action/rosetta/rosetta_ros:${PYTHONPATH:-}"
 
 # Use LEROBOT_VIDEO_CODEC if set, otherwise default to libx264 for speed
 export LEROBOT_VIDEO_CODEC="${LEROBOT_VIDEO_CODEC:-libx264}"
@@ -57,7 +57,7 @@ for ((i=0; i<NUM_SHARDS; i++)); do
     SHARD_REPO_ID="${REPO_ID}_shard_${i}"
     echo "Starting shard $i -> $SHARD_REPO_ID"
 
-    python3 -m rosetta.ros2.port \
+    python3 -m rosetta_ros.offline.port \
         --raw-dir "$RAW_DIR" \
         --contract "$CONTRACT" \
         --repo-id "$SHARD_REPO_ID" \

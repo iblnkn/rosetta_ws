@@ -68,7 +68,7 @@
             "label": "test rosetta (pytest)",
             "detail": "Run pytest directly for rosetta",
             "type": "shell",
-            "command": "pixi run python -m pytest src/action/rosetta/rosetta/test -v",
+            "command": "pixi run python -m pytest src/action/rosetta/rosetta/test src/action/rosetta/rosetta_ros/test -v",
             "group": "test",
             "presentation": {
                 "reveal": "always",
@@ -239,7 +239,7 @@
             "id": "contractPath",
             "type": "promptString",
             "description": "Path to Rosetta contract YAML",
-            "default": "${workspaceFolder}/src/action/rosetta/rosetta/contracts/so_101.yaml"
+            "default": "${workspaceFolder}/src/action/rosetta/rosetta_ros/contracts/so_101.yaml"
         },
         {
             "id": "repoId",
