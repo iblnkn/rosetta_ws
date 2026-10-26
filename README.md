@@ -158,10 +158,11 @@ rosetta_ws/
 ├── pixi.lock                # committed lockfile (reproducible everywhere)
 ├── .colcon/                 # colcon defaults + local mixins
 ├── src/action/              # ROS2 packages (from repos/src.repos)
-│   ├── rosetta/             # Core package (contracts, recorder, porter, policy runner)
-│   ├── rosetta_interfaces/  # ROS2 action/service definitions
-│   ├── rosetta_ros_hil/         # Human-in-the-loop manager, an app on rosetta's public API
-│   ├── rosetta_hil_interfaces/ # Its action/service definitions
+│   ├── rosetta/             # The rosetta repo, four packages:
+│   │   ├── rosetta/             # Core: contract, frames, plugin protocols (no ROS)
+│   │   ├── rosetta_ros/         # ROS 2 robot interface: nodes, porter, launch, contracts
+│   │   ├── rosetta_interfaces/  # ROS 2 actions, services and messages
+│   │   └── rosetta_ros_hil/     # Human-in-the-loop manager
 │   ├── lerobot_rosetta/     # rosetta -> LeRobot adapter (dataset writer, policy runner, servers)
 │   ├── lerobot_robot_rosetta/        # LeRobot-discovered Robot plugin
 │   └── lerobot_teleoperator_rosetta/ # LeRobot-discovered Teleoperator plugin
