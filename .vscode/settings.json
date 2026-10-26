@@ -19,7 +19,8 @@
     "python.analysis.extraPaths": [
         "${workspaceFolder}/.pixi/envs/default/lib/python3.12/site-packages",
         "${workspaceFolder}/install/lib/python3.12/site-packages",
-        "${workspaceFolder}/src/action/rosetta"
+        "${workspaceFolder}/src/action/rosetta/rosetta",
+        "${workspaceFolder}/src/action/rosetta/rosetta_hil"
     ],
     "git.repositoryScanMaxDepth": 4,
     "git-graph.maxDepthOfRepoSearch": 4,

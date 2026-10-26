@@ -18,18 +18,3 @@ repositories:
     type: git
     url: https://github.com/iblnkn/rosetta.git
     version: main
-
-  action/rosetta_interfaces:
-    type: git
-    url: https://github.com/iblnkn/rosetta_interfaces.git
-    version: main
-
-  action/rosetta_hil:
-    type: git
-    url: https://github.com/iblnkn/rosetta_hil.git
-    version: main
-
-  action/rosetta_hil_interfaces:
-    type: git
-    url: https://github.com/iblnkn/rosetta_hil_interfaces.git
-    version: main

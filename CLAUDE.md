@@ -58,9 +58,9 @@ An E2E test runs the full stack against a replayed mission and asserts on final 
 
 ## Continuous Integration
 
-Each package repo (`rosetta`, `rosetta_interfaces`, `rosetta_hil`, `rosetta_hil_interfaces`, `lerobot_rosetta`, `lerobot_robot_rosetta`, `lerobot_teleoperator_rosetta`) has its own standalone, self-contained `.github/workflows/ci.yml`:
+Each package repo has its own standalone, self-contained `.github/workflows/ci.yml`. The `rosetta` repo holds four packages (`rosetta`, `rosetta_interfaces`, `rosetta_hil`, `rosetta_hil_interfaces`) as subdirectories and builds them in one job; `lerobot_rosetta`, `lerobot_robot_rosetta` and `lerobot_teleoperator_rosetta` each have their own repo:
 
-- **`industrial_ci`** (`ros-industrial/industrial_ci@master`) builds and tests the package inside an official ROS Docker image, so there's no "is ROS actually installed on this runner" class of bug (a bare runner + `ros-tooling/setup-ros` was tried first and hit exactly that). `rosdep` resolves deps from `package.xml`; `UPSTREAM_WORKSPACE` (e.g. `"github:iblnkn/rosetta_interfaces#main"`) pulls direct upstream deps inline. `colcon test-result --verbose` and the `ament_cmake` lint tests run automatically — no custom scripting.
+- **`industrial_ci`** (`ros-industrial/industrial_ci@master`) builds and tests the package inside an official ROS Docker image, so there's no "is ROS actually installed on this runner" class of bug (a bare runner + `ros-tooling/setup-ros` was tried first and hit exactly that). `rosdep` resolves deps from `package.xml`; `UPSTREAM_WORKSPACE` (e.g. `"github:iblnkn/rosetta#main"`) pulls direct upstream deps from other repos inline; packages in the same repo need none. `colcon test-result --verbose` and the `ament_cmake` lint tests run automatically — no custom scripting.
 - **`ROSDEP_SKIP_KEYS: ament_python`** is required on every `ament_python` package's job. `ament_python` has no rosdep key (pure-Python build support ships with base ROS, not as an apt package), and `industrial_ci` treats any unresolved key as fatal. This is a known ecosystem-wide rosdep asymmetry, not a `package.xml` bug.
 - **`lint`** is a separate job running `ruff check` against the shared `ruff.toml` (fetched from `rosetta_ws`) — `industrial_ci` predates ruff.
 

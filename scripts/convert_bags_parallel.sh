@@ -12,7 +12,7 @@ WS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Default values
 RAW_DIR="${1:-${WS_ROOT}/datasets/bags}"
-CONTRACT="${2:-${WS_ROOT}/src/action/rosetta/contracts/so_101.yaml}"
+CONTRACT="${2:-${WS_ROOT}/src/action/rosetta/rosetta/contracts/so_101.yaml}"
 REPO_ID="${3:-so_101_dataset}"
 ROOT="${4:-${WS_ROOT}/datasets/lerobot}"
 NUM_SHARDS="${5:-4}"
@@ -37,7 +37,7 @@ if [ "$NUM_BAGS" -eq 0 ]; then
 fi
 
 # Ensure PYTHONPATH includes rosetta
-export PYTHONPATH="${WS_ROOT}/src/action/rosetta:${PYTHONPATH:-}"
+export PYTHONPATH="${WS_ROOT}/src/action/rosetta/rosetta:${PYTHONPATH:-}"
 
 # Use LEROBOT_VIDEO_CODEC if set, otherwise default to libx264 for speed
 export LEROBOT_VIDEO_CODEC="${LEROBOT_VIDEO_CODEC:-libx264}"
@@ -99,7 +99,7 @@ python3 << 'EOF'
 import os
 import sys
 import logging
-sys.path.insert(0, os.environ["WS_ROOT"] + "/src/action/rosetta")
+sys.path.insert(0, os.environ["WS_ROOT"] + "/src/action/rosetta/rosetta")
 
 logging.basicConfig(level=logging.INFO, format="%(message)s")
 
