@@ -46,7 +46,7 @@ known-first-party = [
   "rosetta",
   "rosetta_ros",
   "rosetta_interfaces",
-  "rosetta_hil",
+  "rosetta_ros_hil",
   "rosetta_hil_interfaces",
   "lerobot_rosetta",
   "lerobot_robot_rosetta",
