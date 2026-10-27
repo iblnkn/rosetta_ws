@@ -63,7 +63,8 @@ cmd = "rm -rf build install log"
 description = "ruff over package + workspace python; pre-commit hooks over workspace files"
 default-environment = "default"
 # ruff covers src/action (vcs-imported package repos, invisible to this repo's
-# pre-commit) using the workspace ruff.toml; pre-commit covers the files the
+# pre-commit): each file uses its nearest ruff.toml, the rosetta repo's own or
+# the workspace one that extends it; pre-commit covers the files the
 # workspace repo itself tracks (scripts, yaml, shell). Same layering as pai_ws,
 # adapted to the multi-repo src/ layout.
 cmd = "ruff check src/action scripts && ruff format --check src/action && pre-commit run --all-files"

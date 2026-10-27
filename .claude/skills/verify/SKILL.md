@@ -28,13 +28,15 @@ PYTHONPATH="$PWD/src/action/rosetta/<path>:$PWD/src/action/rosetta/rosetta" pixi
 
 ## Drive the policy inference flow
 
+This is the LeRobot 0.6.x flow (gRPC `async_inference` server). The rosetta `lerobot-inference` branch replaces it with LeRobot's own engines and `lerobot-policy-server`; update this section when that lands.
+
 ```bash
 # Standalone policy server (preloads model before binding port):
-pixi run python -m lerobot_robot_rosetta.policy_server --host=127.0.0.1 --port=8098 \
+pixi run python -m lerobot_rosetta.policy_server --host=127.0.0.1 --port=8098 \
     --policy-type=act --pretrained-name-or-path=iblnk/act-turtlebot3_demo --policy-device=cuda
 
 # Client node (configure spawns + preloads the server; blocks until model loaded):
-pixi run ros2 launch rosetta policy_runner_launch.py \
+pixi run ros2 launch rosetta_ros policy_runner_launch.py \
     contract_path:=$PWD/src/action/rosetta/robots/ros/rosetta_ros/contracts/turtlebot3.yaml
 
 # The RunPolicy action resolves to /run_policy (NOT /policy_runner/run_policy):

@@ -5,10 +5,10 @@ This file provides guidance to AI agents when working with code in this reposito
 `rosetta_ws` is the pixi-based workspace for **Rosetta**, a ROS 2 ↔ LeRobot bridge. Setup and quick-start live in [README.md](README.md); don't duplicate them here.
 
 - **`src/` and `libs/` are gitignored.** `pixi run setup` populates them via `vcs import` from `repos/src.repos` / `repos/libs.repos`. Each package under `src/` is its own git repository — branch, commit, and diff inside the package repo, not in `rosetta_ws`. `pixi run export-repos` pins the current checkouts back into `repos/*.repos`.
-- `libs/lerobot` is stock upstream lerobot pinned at `v0.6.0` — see `repos/libs.repos` for the one local feature branch and why.
+- `libs/lerobot` is stock upstream lerobot pinned at `v0.6.1`, the last release with the `async_inference` the LeRobot policy runner uses — see `repos/libs.repos`.
 - Every colcon invocation shares `.colcon/defaults.yaml` (pixi activation exports `COLCON_DEFAULTS_FILE`). `BUILD_TESTING` is **off** in those defaults: run `pixi run build-with-tests` before `pixi run test`, or there are no tests to run. A CLI `--cmake-args` replaces the defaults list wholesale — restate the `Python_FIND_VIRTUALENV` flags if you override (see the `build-with-tests` task for the full list).
 
-Key tasks (`pixi run <task>`): `build`, `build-with-tests`, `test` (colcon test + `test-result --verbose`), `lint` (ruff over `src/action` and `scripts` with the workspace `ruff.toml`, then pre-commit), `clean`, `start-zenoh` (Zenoh RMW router — own terminal, leave running).
+Key tasks (`pixi run <task>`): `build`, `build-with-tests`, `test` (colcon test + `test-result --verbose`), `lint` (ruff over `src/action` and `scripts`, then pre-commit; the rosetta repo's `ruff.toml` is the source of truth and the workspace `ruff.toml` extends it), `clean`, `start-zenoh` (Zenoh RMW router — own terminal, leave running).
 
 ## Testing Standards
 
@@ -62,6 +62,6 @@ Every public package lives in the `rosetta` monorepo (`src/action/rosetta`): cor
 
 - **`industrial_ci`** (`ros-industrial/industrial_ci@master`) builds and tests the package inside an official ROS Docker image, so there's no "is ROS actually installed on this runner" class of bug (a bare runner + `ros-tooling/setup-ros` was tried first and hit exactly that). `rosdep` resolves deps from `package.xml`. industrial_ci has no package filter: `TARGET_WORKSPACE` lists the directories a job builds (e.g. `"rosetta robots/ros policies/lerobot"`), and a slice must include every in-repo package it depends on. pip-only deps (lerobot, torch) go in `BEFORE_BUILD_TARGET_WORKSPACE`. `colcon test-result --verbose` and the `ament_cmake` lint tests run automatically — no custom scripting.
 - **`ROSDEP_SKIP_KEYS: ament_python`** is required on every `ament_python` package's job. `ament_python` has no rosdep key (pure-Python build support ships with base ROS, not as an apt package), and `industrial_ci` treats any unresolved key as fatal. This is a known ecosystem-wide rosdep asymmetry, not a `package.xml` bug.
-- **`lint`** is a separate job running `ruff check` against the shared `ruff.toml` (fetched from `rosetta_ws`) — `industrial_ci` predates ruff.
+- **`lint.yml`** runs the repo's own `.pre-commit-config.yaml` (ruff check and format at a pinned version, license headers via `CPY001`, file hygiene) against the repo's `ruff.toml`, so CI and local pre-commit match. The private adapter repos' CI downloads that same `ruff.toml`.
 
 `rosetta_ws`'s own CI (`.github/workflows/ci.yaml`) is a separate pixi-based cross-package integration build — it validates the whole pinned workspace together (including the non-ROS pixi/lerobot/torch stack), and is not the primary gate for any individual package.
