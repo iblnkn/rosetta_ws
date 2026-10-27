@@ -160,7 +160,8 @@ rosetta_ws/
 ├── src/action/rosetta/      # The rosetta repo (from repos/src.repos), organized by side:
 │   ├── rosetta/             # Core: contract, frames, plugin protocols (no ROS)
 │   ├── robots/ros/          # rosetta_ros, rosetta_interfaces, rosetta_ros_hil
-│   └── policies/            # lerobot/ (3 packages), starvla/, vla_foundry/
+│   └── policies/lerobot/    # the three LeRobot packages
+├── src/action/starvla_rosetta/, vla_foundry_rosetta/  # private adapter repos (not yet public)
 ├── libs/                    # Python libraries (from repos/libs.repos, editable installs)
 │   └── lerobot/             # LeRobot
 ├── models/                  # Trained policies
