@@ -194,7 +194,7 @@ scripts = ["scripts/activate.sh"]
 # lacks -> dlopen crash. Conda builds link the conda libiconv consistently.
 pyarrow = ">=23,<24"
 av = ">=15,<16"
-# lerobot 0.6.0 pins numpy>=2.0,<2.3; the ROS stack otherwise floats to 2.4.
+# lerobot 0.6.1 pins numpy>=2.0,<2.3; the ROS stack otherwise floats to 2.4.
 numpy = ">=2.2,<2.3"
 
 [feature.lerobot.pypi-dependencies]

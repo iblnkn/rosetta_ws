@@ -1,10 +1,10 @@
 repositories:
-  # Stock upstream lerobot at the v0.6.0 release. The obs_similarity_atol
-  # delta lives on the local branch feature/add_obs_similarity_atol (rebased
-  # onto v0.6.0, PR-ready); until it lands upstream, the async-inference
-  # obs-similarity filter is hardcoded on (atol 1.0) in stock lerobot — see
-  # params/rosetta_client.yaml.
+  # Stock upstream lerobot at the v0.6.1 release, the last with the
+  # async_inference that the rosetta LeRobot policy runner uses (0.6.2 removes
+  # it). Its obs-similarity filter is hardcoded on (atol 1.0), so the runner's
+  # obs_similarity_atol parameter is ignored — see
+  # robots/ros/rosetta_ros/params/policy_runner.yaml in the rosetta repo.
   lerobot:
     type: git
     url: https://github.com/huggingface/lerobot.git
-    version: v0.6.0
+    version: v0.6.1
