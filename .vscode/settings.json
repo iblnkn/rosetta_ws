@@ -20,8 +20,8 @@
         "${workspaceFolder}/.pixi/envs/default/lib/python3.12/site-packages",
         "${workspaceFolder}/install/lib/python3.12/site-packages",
         "${workspaceFolder}/src/action/rosetta/rosetta",
-        "${workspaceFolder}/src/action/rosetta/rosetta_ros",
-        "${workspaceFolder}/src/action/rosetta/rosetta_ros_hil"
+        "${workspaceFolder}/src/action/rosetta/robots/ros/rosetta_ros",
+        "${workspaceFolder}/src/action/rosetta/robots/ros/rosetta_ros_hil"
     ],
     "git.repositoryScanMaxDepth": 4,
     "git-graph.maxDepthOfRepoSearch": 4,

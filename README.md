@@ -157,15 +157,10 @@ rosetta_ws/
 ├── pixi.toml                # THE environment definition (envs, deps, tasks)
 ├── pixi.lock                # committed lockfile (reproducible everywhere)
 ├── .colcon/                 # colcon defaults + local mixins
-├── src/action/              # ROS2 packages (from repos/src.repos)
-│   ├── rosetta/             # The rosetta repo, four packages:
-│   │   ├── rosetta/             # Core: contract, frames, plugin protocols (no ROS)
-│   │   ├── rosetta_ros/         # ROS 2 robot interface: nodes, porter, launch, contracts
-│   │   ├── rosetta_interfaces/  # ROS 2 actions, services and messages
-│   │   └── rosetta_ros_hil/     # Human-in-the-loop manager
-│   ├── lerobot_rosetta/     # rosetta -> LeRobot adapter (dataset writer, policy runner, servers)
-│   ├── lerobot_robot_rosetta/        # LeRobot-discovered Robot plugin
-│   └── lerobot_teleoperator_rosetta/ # LeRobot-discovered Teleoperator plugin
+├── src/action/rosetta/      # The rosetta repo (from repos/src.repos), organized by side:
+│   ├── rosetta/             # Core: contract, frames, plugin protocols (no ROS)
+│   ├── robots/ros/          # rosetta_ros, rosetta_interfaces, rosetta_ros_hil
+│   └── policies/            # lerobot/ (3 packages), starvla/, vla_foundry/
 ├── libs/                    # Python libraries (from repos/libs.repos, editable installs)
 │   └── lerobot/             # LeRobot
 ├── models/                  # Trained policies
@@ -176,7 +171,7 @@ rosetta_ws/
 └── .devcontainer/x86/       # VS Code devcontainer (thin wrapper: mounts workspace, runs pixi)
 ```
 
-`src/action` packages and `libs/` libraries are each their own git repo,
+`src/action/rosetta` and each `libs/` library are their own git repos,
 imported by `pixi run setup`; `repos/*.repos` pins what a fresh clone gets
 (`pixi run export-repos` updates the pins). `libs/COLCON_IGNORE` keeps colcon
 out of the python libraries. Each package README says what that package is

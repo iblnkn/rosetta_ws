@@ -16,7 +16,8 @@ pixi run build --packages-select <pkg...>     # colcon; installs to install/, py
 Fast pytest iteration without rebuilding:
 
 ```bash
-PYTHONPATH="$PWD/src/action/<pkg>:$PWD/src/action/rosetta" pixi run python -m pytest src/action/<pkg>/test/ -q
+PYTHONPATH="$PWD/src/action/rosetta/<path>:$PWD/src/action/rosetta/rosetta" pixi run python -m pytest src/action/rosetta/<path>/test/ -q
+# <path> is the package directory inside the rosetta repo, e.g. robots/ros/rosetta_ros
 ```
 
 ## RMW / discovery gotchas
@@ -34,7 +35,7 @@ pixi run python -m lerobot_robot_rosetta.policy_server --host=127.0.0.1 --port=8
 
 # Client node (configure spawns + preloads the server; blocks until model loaded):
 pixi run ros2 launch rosetta policy_runner_launch.py \
-    contract_path:=$PWD/src/action/rosetta/contracts/turtlebot3.yaml
+    contract_path:=$PWD/src/action/rosetta/robots/ros/rosetta_ros/contracts/turtlebot3.yaml
 
 # The RunPolicy action resolves to /run_policy (NOT /policy_runner/run_policy):
 timeout -s INT 20 pixi run ros2 action send_goal /run_policy \

@@ -37,11 +37,10 @@ select = ["E", "W", "F", "I", "B", "D", "RET", "RUF", "PL", "PIE", "FLY"]
 unfixable = []
 
 [lint.isort]
-# Pinned because isort's first-party detection is cwd-dependent: each package's
-# CI runs `ruff check .` from the package root (where `rosetta/` is a local
-# directory -> first-party), while `pixi run lint` runs from the workspace root
-# (where it is not -> third-party). Without this, the two disagree about import
-# order and CI fails on I001 for files that lint clean locally.
+# Pinned because isort's first-party detection is cwd-dependent: the rosetta
+# repo's CI runs `ruff check .` from the repo root, while `pixi run lint` runs
+# from the workspace root. Without this, the two disagree about import order
+# and CI fails on I001 for files that lint clean locally.
 known-first-party = [
   "rosetta",
   "rosetta_ros",
@@ -50,6 +49,8 @@ known-first-party = [
   "lerobot_rosetta",
   "lerobot_robot_rosetta",
   "lerobot_teleoperator_rosetta",
+  "starvla_rosetta",
+  "vla_foundry_rosetta",
   "rerun_rosetta",
 ]
 # Pinned for the mirror-image reason: `rosetta_ros/launch/` is a real directory, so
