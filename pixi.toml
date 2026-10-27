@@ -253,7 +253,7 @@ env = { PYTORCH_CUDA_ALLOC_CONF = "expandable_segments:True" }
 CMAKE_INSTALL_MODE = "COPY"
 
 # ============================================================================
-# Docs feature: Sphinx site for rosetta (src/action/rosetta/rosetta/doc).
+# Docs feature: Sphinx site for rosetta (src/action/rosetta/docs).
 # Same toolchain the ROS buildfarm's rosdoc2 uses (Sphinx + MyST), so a
 # local build catches what a docs.ros.org build would.
 # ============================================================================
@@ -265,15 +265,15 @@ sphinx-copybutton = ">=0.5"
 sphinx-autobuild = "*"
 
 [feature.docs.tasks.docs-build]
-cmd = "sphinx-build -W -b html src/action/rosetta/rosetta/doc build/docs"
+cmd = "sphinx-build -W -b html src/action/rosetta/docs build/docs"
 description = "Build the docs site to build/docs (warnings are errors)"
 
 [feature.docs.tasks.docs-serve]
-cmd = "sphinx-autobuild --open-browser src/action/rosetta/rosetta/doc build/docs"
+cmd = "sphinx-autobuild --open-browser src/action/rosetta/docs build/docs"
 description = "Serve the docs on localhost with rebuild-on-save"
 
 [feature.docs.tasks.docs-linkcheck]
-cmd = "sphinx-build -b linkcheck src/action/rosetta/rosetta/doc build/docs-linkcheck"
+cmd = "sphinx-build -b linkcheck src/action/rosetta/docs build/docs-linkcheck"
 description = "Check external links in the docs"
 
 [environments]

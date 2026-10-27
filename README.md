@@ -120,7 +120,7 @@ them:
 | `start-zenoh` | default | Zenoh RMW router (own terminal, leave running) |
 | `convert-bags` / `convert-bags-parallel` | default | bag → LeRobot dataset conversion |
 | `train` / `resume-train` | default | LeRobot policy training (`scripts/train_policy.py`) |
-| `docs-build` / `docs-serve` / `docs-linkcheck` | default | Sphinx site from `src/action/rosetta/rosetta/doc` (build with warnings-as-errors, live-reload server, external link check) |
+| `docs-build` / `docs-serve` / `docs-linkcheck` | default | Sphinx site from `src/action/rosetta/docs` (build with warnings-as-errors, live-reload server, external link check) |
 | `export-repos` | default | pin current checkouts back into `repos/*.repos` |
 
 The ML workflow end-to-end, as tasks:
