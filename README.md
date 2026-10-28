@@ -27,7 +27,7 @@ git clone https://github.com/iblnkn/rosetta_ws.git
 cd rosetta_ws
 pixi run --frozen setup    # clone package/library repos + install the default env
 pixi run build             # colcon build -> install/
-pixi run ros2 launch rosetta episode_recorder_launch.py contract_path:=<your contract>
+pixi run ros2 launch rosetta_ros episode_recorder_launch.py contract_path:=<your contract>
 ```
 
 (`--frozen` is only needed for that first `setup`: until it clones `libs/`,
@@ -120,7 +120,7 @@ them:
 | `start-zenoh` | default | Zenoh RMW router (own terminal, leave running) |
 | `convert-bags` / `convert-bags-parallel` | default | bag → LeRobot dataset conversion |
 | `train` / `resume-train` | default | LeRobot policy training (`scripts/train_policy.py`) |
-| `docs-build` / `docs-serve` / `docs-linkcheck` | default | Sphinx site from `src/action/rosetta/doc` (build with warnings-as-errors, live-reload server, external link check) |
+| `docs-build` / `docs-serve` / `docs-linkcheck` | default | Sphinx site from `src/action/rosetta/docs` (build with warnings-as-errors, live-reload server, external link check) |
 | `export-repos` | default | pin current checkouts back into `repos/*.repos` |
 
 The ML workflow end-to-end, as tasks:
@@ -128,7 +128,7 @@ The ML workflow end-to-end, as tasks:
 ```bash
 pixi run convert-bags --raw-dir ... --contract ... --repo-id ...
 pixi run train --help
-pixi run ros2 launch rosetta policy_runner_launch.py \
+pixi run ros2 launch rosetta_ros policy_runner_launch.py \
     contract_path:=... pretrained_name_or_path:=...
 ```
 
@@ -157,12 +157,11 @@ rosetta_ws/
 ├── pixi.toml                # THE environment definition (envs, deps, tasks)
 ├── pixi.lock                # committed lockfile (reproducible everywhere)
 ├── .colcon/                 # colcon defaults + local mixins
-├── src/action/              # ROS2 packages (from repos/src.repos)
-│   ├── rosetta/             # Core package (contracts, recorder, porter, policy runner)
-│   ├── rosetta_interfaces/  # ROS2 action/service definitions
-│   ├── lerobot_rosetta/     # rosetta -> LeRobot adapter (dataset writer, policy runner, servers)
-│   ├── lerobot_robot_rosetta/        # LeRobot-discovered Robot plugin
-│   └── lerobot_teleoperator_rosetta/ # LeRobot-discovered Teleoperator plugin
+├── src/action/rosetta/      # The rosetta repo (from repos/src.repos), organized by side:
+│   ├── rosetta/             # Core: contract, frames, plugin protocols (no ROS)
+│   ├── robots/ros/          # rosetta_ros, rosetta_interfaces, rosetta_ros_hil
+│   └── policies/lerobot/    # the three LeRobot packages
+├── src/action/starvla_rosetta/, vla_foundry_rosetta/  # private adapter repos (not yet public)
 ├── libs/                    # Python libraries (from repos/libs.repos, editable installs)
 │   └── lerobot/             # LeRobot
 ├── models/                  # Trained policies
@@ -173,7 +172,7 @@ rosetta_ws/
 └── .devcontainer/x86/       # VS Code devcontainer (thin wrapper: mounts workspace, runs pixi)
 ```
 
-`src/action` packages and `libs/` libraries are each their own git repo,
+`src/action/rosetta` and each `libs/` library are their own git repos,
 imported by `pixi run setup`; `repos/*.repos` pins what a fresh clone gets
 (`pixi run export-repos` updates the pins). `libs/COLCON_IGNORE` keeps colcon
 out of the python libraries. Each package README says what that package is
